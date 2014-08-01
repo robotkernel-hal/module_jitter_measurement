@@ -22,8 +22,8 @@
  * along with robotkernel.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "modules/jitter_measurement/jitter_measurement.h"
-#include "kernel.h"
+#include "jitter_measurement.h"
+#include "robotkernel/kernel.h"
 #include "config.h"
 #include <stdlib.h>
 #include <string.h>

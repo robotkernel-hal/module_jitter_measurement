@@ -43,6 +43,11 @@ AC_SUBST(SET_MAKE)
 # setup rmpm
 RMPM_ARCH
 
+if test "$rmpm_host" == "arm-angstrom-linux-gnueabi"; then
+   ARCH_CFLAGS="-DNO_RDTSC"
+fi
+AC_SUBST(ARCH_CFLAGS)
+
 # try to automatically find ln
 LN_GENERATE_ARGS='-md_dir $(srcdir)/message_definitions'
 if test -n "${LN_BASE}"; then

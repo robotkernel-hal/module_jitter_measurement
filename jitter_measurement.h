@@ -25,13 +25,13 @@
 #ifndef __JITTER_MEASSUREMENT_H__
 #define __JITTER_MEASSUREMENT_H__
 
-#include "modules/jitter_measurement/module_jitter_measurement.h"
+#include "module_jitter_measurement.h"
 
 #define LN_UNREGISTER_SERVICE_IN_BASE_DETOR  
-#include "modules/jitter_measurement/ln_messages.h"
+#include "ln_messages.h"
 #undef LN_UNREGISTER_SERVICE_IN_BASE_DETOR
 
-#include "runnable.h"
+#include "robotkernel/runnable.h"
 #include "config.h"
 
 #include "yaml-cpp/yaml.h"
