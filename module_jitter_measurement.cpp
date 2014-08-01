@@ -3,10 +3,10 @@
   $Id$
  */
 
-#include "modules/jitter_measurement/module_jitter_measurement.h"
-#include "modules/jitter_measurement/jitter_measurement.h"
+#include "module_jitter_measurement.h"
+#include "jitter_measurement.h"
 #include "config.h"
-#include "kernel.h"
+#include "robotkernel/kernel.h"
 
 #include "yaml-cpp/yaml.h"
 

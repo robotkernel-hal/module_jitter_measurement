@@ -6,8 +6,8 @@
 #ifndef __MODULE_JITTER_MEASSUREMENT_H__
 #define __MODULE_JITTER_MEASSUREMENT_H__
 
-#include "module_intf.h"
-#include "kernel.h"
+#include "robotkernel/module_intf.h"
+#include "robotkernel/kernel.h"
 
 void jm_log(std::string mod_name, robotkernel::loglevel lvl, const char *format, ...);
 
