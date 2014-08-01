@@ -1,0 +1,14 @@
+module jitter measurement
+
+1. configuration
+
+config:
+    buffer_size: 1000
+    cps: 3000000000
+trigger:
+-   mod_name: other_module
+    clk_id: 1
+    direct_mode: false
+    prio: 10
+    affinity: [1, ]
+
