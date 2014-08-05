@@ -2,6 +2,7 @@ PTVERSION           = 2
 NAME                = @PACKAGE@
 VERSION             = @PACKAGE_VERSION@
 DESCRIPTION         = robotkernel jitter measurement module
+DOCUMENTATION       = https://rmintra01.robotic.dlr.de/wiki/robotkernel/module_jitter_meassurements
 MAINTAINER          = Robert Burger <robert.burger@dlr.de>
 ARCHS               = sled11-x86-gcc4.x, sled11-x86_64-gcc4.x, angstrom-armv7-gcc4.7, vxworks6.7-x86-gcc4.x, vxworks6.8-x86-gcc4.x, vxworks6.9-x86-gcc4.x, vxworks6.9.3-x86-gcc4.x, vxworks6.9.4-x86-gcc4.x, qnx6.3-x86-gcc3.3, qnx6.5-x86-gcc4.x, qnx6.5-x86-gcc4.x-gpp
 
@@ -9,4 +10,5 @@ ARCHS               = sled11-x86-gcc4.x, sled11-x86_64-gcc4.x, angstrom-armv7-gc
 build/${ARCH}/install/lib => lib/${ARCH}
 doc/ => doc/
 message_definitions/ => share/message_definitions
+share/ => share/
 
