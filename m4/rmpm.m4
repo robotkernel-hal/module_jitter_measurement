@@ -54,9 +54,11 @@ AC_DEFUN([RMPM_CHECK_MODULES],
              $1[]_CFLAGS=$(env -i /volume/software/common/packages/rmpm/latest/bin/sled11-x86-gcc4.x/ctool --allow-beta --noquotes --c++ --compiler-flags --arch=$rmpm_host "$2")
              $1[]_LIBS=$(env -i /volume/software/common/packages/rmpm/latest/bin/sled11-x86-gcc4.x/ctool --allow-beta --noquotes --c++ --linker-flags --arch=$rmpm_host "$2")
              $1[]_BASE=$(env -i /volume/software/common/packages/rmpm/latest/bin/sled11-x86-gcc4.x/pkgtool --allow-beta --key=PKGROOT "$2")
+             $1[]_DEPENDS=$(env -i /volume/software/common/packages/rmpm/latest/bin/sled11-x86-gcc4.x/pkgtool --allow-beta --key=DEPENDS "$2")
 
              AC_SUBST($1[]_CFLAGS)
              AC_SUBST($1[]_LIBS)
              AC_SUBST($1[]_BASE)
+             AC_SUBST($1[]_DEPENDS)
          fi])
          
