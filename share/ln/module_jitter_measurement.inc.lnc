@@ -1,0 +1,22 @@
+requires_version 0.2.43
+# this include file can be customized with the following defines:
+#   module_jitter_measurement_base
+#     (optional) path to module_jitter_measurement base directory
+#     e.g. /volume/software/robotkernel/packages/module_jitter_measurement/3.0.1
+#     defaults to rmpm structure
+#   module_jitter_measurement_libdir
+#     (optional) add custom module search paths
+#   module_jitter_measurement_mds
+#     (optional) add custom message definition paths
+
+defines
+module_jitter_measurement_base: %(dirname %(dirname %(CURDIR)))
+module_jitter_measurement_libdir: %(module_jitter_measurement_base)/lib/$(ARCH)
+module_jitter_measurement_mds: %(module_jitter_measurement_base)/share/message_definitions
+
+ifndef rk_modules: rk_modules: ""
+rk_modules: %(rk_modules):%(module_jitter_measurement_libdir)
+
+ifndef rk_mds: rk_mds: ""
+rk_mds: %(rk_mds):%(module_jitter_measurement_mds)
+
