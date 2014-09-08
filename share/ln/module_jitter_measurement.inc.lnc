@@ -11,8 +11,9 @@ requires_version 0.2.43
 
 defines
 module_jitter_measurement_base: %(dirname %(dirname %(CURDIR)))
-module_jitter_measurement_libdir: %(module_jitter_measurement_base)/lib/$(ARCH)
-module_jitter_measurement_mds: %(module_jitter_measurement_base)/share/message_definitions
+module_jitter_measurement_base_type: %(ifexists "%(module_jitter_measurement_base)/lib/libmodule_jitter_measurement.so", "local_install", "rmpm_release")
+module_jitter_measurement_libdir: %(ifeq "%(module_jitter_measurement_base_type)", "local_install", "%(module_jitter_measurement_base)/lib", "%(module_jitter_measurement_base)/lib/$(ARCH)")
+add_message_definition_dir: %(module_jitter_measurement_base)/share/message_definitions
 
 ifndef rk_modules: rk_modules: ""
 rk_modules: %(rk_modules):%(module_jitter_measurement_libdir)
