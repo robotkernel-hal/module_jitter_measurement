@@ -106,6 +106,12 @@ void jitter_measurement::register_services() {
     }
 }
 
+#ifdef __VXWORKS__
+#include <vxWorks.h>
+#include <sysLib.h>
+#include <taskLib.h>
+#endif
+
 //! calibrate function for clocks per second
 void jitter_measurement::calibrate() {
     if (cps != 1)
@@ -115,10 +121,18 @@ void jitter_measurement::calibrate() {
     maxever     = 0;
 #if !defined(NO_RDTSC)
     jm_log(name, info, "calibrating clocks/sec...\n");
+
+#ifdef __VXWORKS__
+    taskDelay(1);
+    uint64_t begin = __rdtsc();
+    taskDelay(1);
+    cps = (__rdtsc() - begin - 1.2E5) * sysClkRateGet();
+#else
     uint64_t begin = __rdtsc();
     struct timespec ts = { 0, 1E7 };
     nanosleep(&ts, NULL);
-    cps = (__rdtsc() - begin) * 100;
+    cps = (__rdtsc() - begin) * 98.3; // magic factor to correct cps
+#endif
     jm_log(name, info, "got %llu clock/sec\n", cps);
 #else
     cps = 1e9;
