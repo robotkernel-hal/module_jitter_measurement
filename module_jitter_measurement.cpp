@@ -106,7 +106,11 @@ int mod_set_state(MODULE_HANDLE hdl, module_state_t state) {
 
     switch (state) {
         case module_state_init:
+		j->unregister_pd();
+		break;
         case module_state_preop:
+		j->register_pd();
+		break;
         case module_state_safeop:
             break;
         case module_state_op:
@@ -164,6 +168,24 @@ int mod_request(MODULE_HANDLE hdl, int reqcode, void* ptr) {
         case MOD_REQUEST_REGISTER_SERVICES:
             j->register_services();
             break;
+        case MOD_REQUEST_GET_PDIN: {
+		process_data_t *pdg = (process_data_t *)ptr;
+		pdg->pd = &j->pdin;
+		pdg->len = sizeof(j->pdin);
+		break;
+        }
+        case MOD_REQUEST_SET_TRIGGER_CB: {
+		set_trigger_cb_t *cb = (set_trigger_cb_t *)ptr;
+		if (!j->add_trigger_module(*cb))
+			ret = -1;
+		break;
+        }
+        case MOD_REQUEST_UNSET_TRIGGER_CB: {
+		set_trigger_cb_t *cb = (set_trigger_cb_t *)ptr;
+		if (!j->remove_trigger_module(*cb))
+			ret = -1;
+		break;
+        }
         default:
             jm_log(j->name, verbose, "not implemented request %d\n", reqcode);
             ret = -1;

@@ -32,12 +32,14 @@
 #undef LN_UNREGISTER_SERVICE_IN_BASE_DETOR
 
 #include "robotkernel/runnable.h"
+#include "robotkernel/trigger_base.h"
 #include "config.h"
 
 #include "yaml-cpp/yaml.h"
 
 class jitter_measurement : 
-    public robotkernel::runnable, 
+    public robotkernel::runnable,
+    public robotkernel::trigger_base,
     public ln_service_reset_max_ever_base,
     public ln_service_get_cps_base {
 
@@ -62,9 +64,16 @@ class jitter_measurement :
 
     public:
         module_state_t state;     //! module state
-        uint64_t maxever;         //! max ever seen jitter
         std::string name;         //! jitter_measurement name
         size_t buffer_size;       //! size of jitter measurement buffer
+	robotkernel::kernel::interface_id_t pd_interface_id;
+
+	struct jitter_pd {
+		uint64_t maxever;         //! max ever seen jitter
+		uint64_t last_max;
+		uint64_t last_cycle;
+		uint64_t last_ts;
+	} pdin;
 
         //! yaml config construction
         /*!
@@ -78,6 +87,8 @@ class jitter_measurement :
 
         //! register services
         void register_services();
+	void register_pd();
+	void unregister_pd();
 
         //! does one measurement
         /*!
