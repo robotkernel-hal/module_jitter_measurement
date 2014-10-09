@@ -174,6 +174,12 @@ int mod_request(MODULE_HANDLE hdl, int reqcode, void* ptr) {
 		pdg->len = sizeof(j->pdin);
 		break;
         }
+        case MOD_REQUEST_GET_PDOUT: {
+		process_data_t *pdg = (process_data_t *)ptr;
+		pdg->pd = &j->pdout;
+		pdg->len = sizeof(j->pdout);
+		break;
+        }
         case MOD_REQUEST_SET_TRIGGER_CB: {
 		set_trigger_cb_t *cb = (set_trigger_cb_t *)ptr;
 		if (!j->add_trigger_module(*cb))

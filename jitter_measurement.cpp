@@ -62,6 +62,7 @@ jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node)
     log_diff    = new uint64_t[buffer_size];
     buffer_pos  = 0;
     memset(&pdin, 0, sizeof(pdin));
+    pdout.max_ever_clamp = 0; // disable clamp
     cps         = 1;
     pd_interface_id = NULL;
     
@@ -223,6 +224,8 @@ void jitter_measurement::print() {
     maxjit = maxjit * fac;
     pdin.last_max = maxjit;
     pdin.maxever = max(pdin.maxever, maxjit);
+    if(pdout.max_ever_clamp != 0 && pdin.maxever > pdout.max_ever_clamp)
+	    pdin.maxever = pdout.max_ever_clamp;
 
     trigger_modules();
     
