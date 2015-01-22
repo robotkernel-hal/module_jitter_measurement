@@ -151,7 +151,7 @@ void jitter_measurement::calibrate() {
     taskDelay(1);
     uint64_t begin = __rdtsc();
     taskDelay(1);
-    cps = (__rdtsc() - begin - 1.2E5) * sysClkRateGet();
+    cps = (uint64_t)((__rdtsc() - begin - 1.2E5) * sysClkRateGet());
 #else
     uint64_t begin = __rdtsc();
     struct timespec ts = { 0, 1E7 };
@@ -228,16 +228,17 @@ void jitter_measurement::print() {
 
     // calculating maximum deviation 
     for (i = 0; i < buffer_size - 1; i++) {
-        dev     = abs(log_diff[i] - cycle);
+        dev     = log_diff[i] - cycle;
+        if (dev < 0) dev *= -1;
         maxjit  = max(dev, maxjit);
         avgjit += (dev * dev);
     }
     avgjit /= (buffer_size - 1);
 
     double fac = (1E6 / (double)cps);
-    avgjit = sqrt((double)avgjit) * fac;
-    cycle  = cycle  * fac;
-    maxjit = maxjit * fac;
+    avgjit = (uint64_t)(sqrt((double)avgjit) * fac);
+    cycle  = (uint64_t)(cycle  * fac);
+    maxjit = (uint64_t)(maxjit * fac);
     pdin.last_cycle = cycle;
     pdin.last_max = maxjit;
     pdin.maxever = max(pdin.maxever, maxjit);
