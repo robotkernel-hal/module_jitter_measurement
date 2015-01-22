@@ -228,8 +228,7 @@ void jitter_measurement::print() {
 
     // calculating maximum deviation 
     for (i = 0; i < buffer_size - 1; i++) {
-        dev     = log_diff[i] - cycle;
-        if (dev < 0) dev *= -1;
+        dev     = labs(log_diff[i] - cycle); 
         maxjit  = max(dev, maxjit);
         avgjit += (dev * dev);
     }
