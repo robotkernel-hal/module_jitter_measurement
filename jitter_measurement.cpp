@@ -54,28 +54,35 @@ uint64_t __rdtsc(void) {
  * \param node yaml node
  */
 jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node) 
-    : runnable(0, 0) {
+: runnable(0, 0) {
     buffer_size = node["buffer_size"].to<unsigned int>();
     this->name = string(name);
 
-    buffer      = new uint64_t[buffer_size];
-    log_diff    = new uint64_t[buffer_size];
-    buffer_pos  = 0;
-    memset(&pdin, 0, sizeof(pdin));
-    pdout.max_ever_clamp = 0; // disable clamp
-    cps         = 1;
+    buffer[0]       = new uint64_t[buffer_size];
+    buffer[1]       = new uint64_t[buffer_size];
+    log_diff        = new uint64_t[buffer_size];
+    buffer_pos      = 0;
+    buffer_act      = 0;
+    cps             = 1;
     pd_interface_id = NULL;
-    
+    threaded        = false;
+    pdout.max_ever_clamp = 0; // disable clamp
+    memset(&pdin, 0, sizeof(pdin));
+
     if (node.FindValue("cps"))
         cps = node["cps"].to<uint64_t>();
 
-    memset(buffer, 0, sizeof(uint64_t) * buffer_size);
+    if (node.FindValue("threaded"))
+        threaded = node["threaded"].to<bool>();
+
+    memset(buffer[0], 0, sizeof(uint64_t) * buffer_size);
+    memset(buffer[1], 0, sizeof(uint64_t) * buffer_size);
     memset(log_diff, 0, sizeof(uint64_t) * buffer_size);
 
     // create ipc structures
     pthread_mutex_init(&sync_lock, NULL);
     pthread_cond_init(&sync_cond, NULL);
-    
+
     // set state to init
     state = module_state_init;
 
@@ -84,13 +91,13 @@ jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node)
 
 //! default destruction
 jitter_measurement::~jitter_measurement() {
-    if (buffer) {
-        delete[] buffer;
-    }
+    if (buffer[0]) 
+        delete[] buffer[0];
+    if (buffer[1]) 
+        delete[] buffer[1];
 
-    if (log_diff) {
+    if (log_diff)
         delete[] log_diff;
-    }
 
     // destroy ipc structures
     pthread_mutex_destroy(&sync_lock);
@@ -103,24 +110,25 @@ void jitter_measurement::register_services() {
     kernel& k = *kernel::get_instance();
     if (k.clnt) {
         string base = k.clnt->name + "." + this->name + ".";
-    	register_reset_max_ever(k.clnt, base + "reset_max_ever");
+        register_reset_max_ever(k.clnt, base + "reset_max_ever");
         register_get_cps(k.clnt, base + "get_cps");
     }
 }
 
 void jitter_measurement::register_pd() {
-	if(pd_interface_id)
-		return;
-	pd_interface_id = kernel::register_interface_cb(
-		name.c_str(), 
-		"libinterface_process_data_inspection.so", 
-		"last_jitter", 0);
+    if(pd_interface_id)
+        return;
+    pd_interface_id = kernel::register_interface_cb(
+            name.c_str(), 
+            "libinterface_process_data_inspection.so", 
+            "last_jitter", 0);
 }
+    
 void jitter_measurement::unregister_pd() {
-	if(!pd_interface_id)
-		return;
-	kernel::unregister_interface_cb(pd_interface_id);
-	pd_interface_id = NULL;
+    if(!pd_interface_id)
+        return;
+    kernel::unregister_interface_cb(pd_interface_id);
+    pd_interface_id = NULL;
 }
 
 #ifdef __VXWORKS__
@@ -168,28 +176,37 @@ void jitter_measurement::measure() {
     clock_gettime(CLOCK_REALTIME, &ts);
     pdin.last_ts = (uint64_t)(ts.tv_sec * 1e9 + ts.tv_nsec);
 #endif
-    buffer[buffer_pos++] = pdin.last_ts;
+    buffer[buffer_act][buffer_pos++] = pdin.last_ts;
     if (buffer_pos >= buffer_size) {
         buffer_pos = 0;
-        print();
-        //pthread_cond_signal(&sync_cond);
+        buffer_act = (buffer_act + 1) % 2; 
+
+        if (threaded)
+            pthread_cond_signal(&sync_cond);
+        else print();
     }
+    trigger_modules();
 }
 
 //! returns last measuremente
 double jitter_measurement::last_measurement() { 
     uint64_t tick_act, tick_last;
     int act_pos = buffer_pos;
+    int act_buf = buffer_act;
 
     // get actual tick
-    if (act_pos == 0)
+    if (act_pos == 0) {
         act_pos = buffer_size - 1;
-    tick_act = buffer[act_pos];
-    
+        act_buf = (act_buf + 1) % 2;
+    }
+    tick_act = buffer[act_buf][act_pos--];
+
     // get last tick
-    if (act_pos == 0)
+    if (act_pos == 0) {
         act_pos = buffer_size - 1;
-    tick_last = buffer[act_pos];
+        act_buf = (act_buf + 1) % 2;
+    }
+    tick_last = buffer[act_buf][act_pos];
 
     return (double)(tick_act - tick_last)/cps;
 }
@@ -197,43 +214,41 @@ double jitter_measurement::last_measurement() {
 //! print last buffer measurement values
 void jitter_measurement::print() {
     unsigned int i;
+    int act_buf = (buffer_act + 1) % 2;
 
     uint64_t dev;
     uint64_t cycle = 0, avgjit = 0, maxjit = 0;
 
     // calculate differences and sum of differences
-    for (i = buffer_pos; i < buffer_size - 1; ++i) {
-        log_diff[i] = buffer[i+1] - buffer[i];
-        cycle += log_diff[i];
+    for (i = 0; i < buffer_size - 1; ++i) {
+        log_diff[i]  = buffer[act_buf][i+1] - buffer[act_buf][i];
+        cycle       += log_diff[i];
     }
-    cycle /= buffer_size - buffer_pos;
+    cycle /= buffer_size - 1;
 
     // calculating maximum deviation 
-    for (i = buffer_pos; i < buffer_size - 1; i++) {
-        dev = fabsl(((long double)log_diff[i]) - cycle);
-        maxjit = max(dev, maxjit);
+    for (i = 0; i < buffer_size - 1; i++) {
+        dev     = abs(log_diff[i] - cycle);
+        maxjit  = max(dev, maxjit);
         avgjit += (dev * dev);
     }
-    avgjit /= buffer_size - 1 - buffer_pos;
+    avgjit /= (buffer_size - 1);
 
     double fac = (1E6 / (double)cps);
-    avgjit = sqrt((double)avgjit);
+    avgjit = sqrt((double)avgjit) * fac;
     cycle  = cycle  * fac;
-    pdin.last_cycle = cycle;
-    avgjit = avgjit * fac;
     maxjit = maxjit * fac;
+    pdin.last_cycle = cycle;
     pdin.last_max = maxjit;
     pdin.maxever = max(pdin.maxever, maxjit);
     if(pdout.max_ever_clamp != 0 && pdin.maxever > pdout.max_ever_clamp)
-	    pdin.maxever = pdout.max_ever_clamp;
+        pdin.maxever = pdout.max_ever_clamp;
 
-    trigger_modules();
-    
     jm_log(name, info, "mean period: %4lluus, jitter mean:"
             " %2lluus, max %3lluus, max ever %3lluus\n",
             cycle, avgjit, maxjit, pdin.maxever);
 }
-        
+
 //! handler function called if thread is running
 void jitter_measurement::run() {
     jm_log(name, info, "handler running\n");
@@ -264,10 +279,11 @@ int jitter_measurement::on_reset_max_ever(ln::service_request& req,
     req.respond();
     return 0;
 }
-        
+
 int jitter_measurement::on_get_cps(ln::service_request& req, 
         ln_service_robotkernel_jitter_measurement_get_cps& svc) {
     svc.resp.cps = cps;
     req.respond();
     return 0;
 }
+

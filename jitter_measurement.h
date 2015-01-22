@@ -37,7 +37,7 @@
 
 #include "yaml-cpp/yaml.h"
 
-class jitter_measurement : 
+class jitter_measurement :
     public robotkernel::runnable,
     public robotkernel::trigger_base,
     public ln_service_reset_max_ever_base,
@@ -45,10 +45,11 @@ class jitter_measurement :
 
     private: 
         //! position in buffer
+        unsigned int buffer_act;
         unsigned int buffer_pos;
 
         //! memory buffer for jitter measurement
-        uint64_t *buffer;
+        uint64_t *buffer[2];
         uint64_t *log_diff;
         uint64_t cps;
 
@@ -63,21 +64,23 @@ class jitter_measurement :
         void run();
 
     public:
+
         module_state_t state;     //! module state
         std::string name;         //! jitter_measurement name
         size_t buffer_size;       //! size of jitter measurement buffer
-	robotkernel::kernel::interface_id_t pd_interface_id;
+        robotkernel::kernel::interface_id_t pd_interface_id;
+        bool threaded;
 
-	struct jitter_pdin {
-		uint64_t maxever;         //! max ever seen jitter
-		uint64_t last_max;
-		uint64_t last_cycle;
-		uint64_t last_ts;
-	} pdin;
-	
-	struct jitter_pdout {
-		uint64_t max_ever_clamp;
-	} pdout;
+        struct jitter_pdin {
+            uint64_t maxever;         //! max ever seen jitter
+            uint64_t last_max;
+            uint64_t last_cycle;
+            uint64_t last_ts;
+        } pdin;
+
+        struct jitter_pdout {
+            uint64_t max_ever_clamp;
+        } pdout;
 
         //! yaml config construction
         /*!
@@ -91,15 +94,15 @@ class jitter_measurement :
 
         //! register services
         void register_services();
-	void register_pd();
-	void unregister_pd();
+        void register_pd();
+        void unregister_pd();
 
         //! does one measurement
         /*!
          * if log buffer is full, output thread is triggered
          */
         void measure();
-        
+
         //! calibrate function for clocks per second
         void calibrate();
 

@@ -1,7 +1,7 @@
 //! ÜBER-control Module jitter_measurement
 /*!
   $Id$
- */
+  */
 
 #include "module_jitter_measurement.h"
 #include "jitter_measurement.h"
@@ -36,7 +36,7 @@ extern "C" {
 /*!
   \param config configure string
   \return handle on success, NULL otherwise
- */
+  */
 MODULE_HANDLE mod_configure(const char* name, const char* config) {
     jitter_measurement *j = NULL;
 
@@ -46,7 +46,7 @@ MODULE_HANDLE mod_configure(const char* name, const char* config) {
     stringstream stream(config);
     YAML::Parser parser(stream);
     YAML::Node doc;
-    
+
     if (!parser.GetNextDocument(doc)) {
         jm_log(string(name), error, "error parsing config file\n");
         goto ErrorExit;
@@ -57,7 +57,7 @@ MODULE_HANDLE mod_configure(const char* name, const char* config) {
         j = new jitter_measurement(name, doc);
         if (!j) {
             jm_log(string(name), error, "cannot allocate memory: %s\n",
-                 strerror(errno));
+                    strerror(errno));
             goto ErrorExit;
         }
         jm_log(string(name), info, "configured buffer_size %d\n", j->buffer_size);
@@ -81,7 +81,7 @@ ErrorExit:
 /*!
   \param hdl module handle
   \return success or failure
- */
+  */
 int mod_unconfigure(MODULE_HANDLE hdl) {
     // cast struct
     jitter_measurement *j = (jitter_measurement *)hdl;
@@ -97,7 +97,7 @@ int mod_unconfigure(MODULE_HANDLE hdl) {
   \param hdl module handle
   \param state requested state
   \return success or failure
- */
+  */
 int mod_set_state(MODULE_HANDLE hdl, module_state_t state) {
     // cast struct
     jitter_measurement *j = (jitter_measurement *)hdl;
@@ -106,11 +106,14 @@ int mod_set_state(MODULE_HANDLE hdl, module_state_t state) {
 
     switch (state) {
         case module_state_init:
-		j->unregister_pd();
-		break;
+            j->stop();
+            j->unregister_pd();
+            break;
         case module_state_preop:
-		j->register_pd();
-		break;
+            j->register_pd();
+            if (j->threaded)
+                j->start();
+            break;
         case module_state_safeop:
             break;
         case module_state_op:
@@ -134,7 +137,7 @@ int mod_set_state(MODULE_HANDLE hdl, module_state_t state) {
 /*!
   \param hdl module handle
   \return current state
- */
+  */
 module_state_t mod_get_state(MODULE_HANDLE hdl) {
     // cast struct and return state
     jitter_measurement *j = (jitter_measurement *)hdl;
@@ -157,7 +160,7 @@ void mod_trigger(MODULE_HANDLE hdl) {
   \param reqcode request code
   \param ptr pointer to request structure
   \return success or failure
- */
+  */
 int mod_request(MODULE_HANDLE hdl, int reqcode, void* ptr) {
     int ret = 0;
 
@@ -169,28 +172,28 @@ int mod_request(MODULE_HANDLE hdl, int reqcode, void* ptr) {
             j->register_services();
             break;
         case MOD_REQUEST_GET_PDIN: {
-		process_data_t *pdg = (process_data_t *)ptr;
-		pdg->pd = &j->pdin;
-		pdg->len = sizeof(j->pdin);
-		break;
+            process_data_t *pdg = (process_data_t *)ptr;
+            pdg->pd = &j->pdin;
+            pdg->len = sizeof(j->pdin);
+            break;
         }
         case MOD_REQUEST_GET_PDOUT: {
-		process_data_t *pdg = (process_data_t *)ptr;
-		pdg->pd = &j->pdout;
-		pdg->len = sizeof(j->pdout);
-		break;
+            process_data_t *pdg = (process_data_t *)ptr;
+            pdg->pd = &j->pdout;
+            pdg->len = sizeof(j->pdout);
+            break;
         }
         case MOD_REQUEST_SET_TRIGGER_CB: {
-		set_trigger_cb_t *cb = (set_trigger_cb_t *)ptr;
-		if (!j->add_trigger_module(*cb))
-			ret = -1;
-		break;
+            set_trigger_cb_t *cb = (set_trigger_cb_t *)ptr;
+            if (!j->add_trigger_module(*cb))
+                ret = -1;
+            break;
         }
         case MOD_REQUEST_UNSET_TRIGGER_CB: {
-		set_trigger_cb_t *cb = (set_trigger_cb_t *)ptr;
-		if (!j->remove_trigger_module(*cb))
-			ret = -1;
-		break;
+            set_trigger_cb_t *cb = (set_trigger_cb_t *)ptr;
+            if (!j->remove_trigger_module(*cb))
+                ret = -1;
+            break;
         }
         default:
             jm_log(j->name, verbose, "not implemented request %d\n", reqcode);
@@ -200,8 +203,6 @@ int mod_request(MODULE_HANDLE hdl, int reqcode, void* ptr) {
 
     return ret;
 }
-
-
 
 #if 0
 {
