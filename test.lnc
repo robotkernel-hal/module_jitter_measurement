@@ -1,0 +1,29 @@
+instance
+name: jitter test
+manager: %(shell hostname):54111
+enable_auto_groups: true
+
+push_name_prefix all
+
+process build
+pass_environment: HOME, PATH
+change_directory: %(CURDIR)
+command: make -f Makefile.suggested ARCH=sled11-x86-gcc4.x install
+flags: start_in_shell
+node: localhost
+
+defines
+rk_base: /volume/software/robotkernel/packages/robotkernel/latest
+rk_config: %(CURDIR)/test.rkc
+rk_arguments: --config %(rk_config)
+rk_debug: true
+
+pipe_include [ 
+	     %(rk_base)/share/ln/generate_ln_includes 
+
+	     module_jitter_measurement=%(CURDIR)/build/sled11-x86-gcc4.x/install
+	     
+	     with_gui
+
+	     %(rk_config)
+]

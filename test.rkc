@@ -1,0 +1,20 @@
+# -*- mode: yaml -*-
+
+modules:
+- name: printer
+  module_file: libmodule_jitter_measurement.so
+  power_up: true
+  config: 
+    buffer_size: 1000
+    new_maxever_command: echo "stop lttng flightrecorder!"
+  trigger:
+    - mod_name: timer
+      clk_id: 1
+      direct_mode: true
+
+- name: timer
+  module_file: libmodule_posix_timer.so
+  config:
+    interval: 0.001
+    mode: nanosleep
+

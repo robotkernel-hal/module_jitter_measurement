@@ -70,17 +70,21 @@ class jitter_measurement :
         size_t buffer_size;       //! size of jitter measurement buffer
         robotkernel::kernel::interface_id_t pd_interface_id;
         bool threaded;
-
-        struct jitter_pdin {
-            uint64_t maxever;         //! max ever seen jitter
-            uint64_t last_max;
-            uint64_t last_cycle;
-            uint64_t last_ts;
-        } pdin;
-
-        struct jitter_pdout {
-            uint64_t max_ever_clamp;
-        } pdout;
+	bool is_printing;
+	char maxever_time_string[64];
+	std::string new_maxever_command;
+	
+	struct jitter_pdin {
+		uint64_t maxever;         //! max ever seen jitter
+		uint64_t last_max;
+		uint64_t last_cycle;
+		uint64_t last_ts;
+		double maxever_time; // unix timestamp of last maxever increment!
+	} pdin;
+	
+	struct jitter_pdout {
+		uint64_t max_ever_clamp;
+	} pdout;
 
         //! yaml config construction
         /*!

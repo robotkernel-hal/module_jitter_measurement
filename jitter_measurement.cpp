@@ -36,6 +36,7 @@
 #include <math.h>
 
 #include "yaml-cpp/yaml.h"
+#include <string_util/string_util.h>
 
 using namespace std;
 using namespace robotkernel;
@@ -65,16 +66,19 @@ jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node)
     buffer_act      = 0;
     cps             = 1;
     pd_interface_id = NULL;
-    threaded        = false;
+    threaded        = true;
     pdout.max_ever_clamp = 0; // disable clamp
     memset(&pdin, 0, sizeof(pdin));
 
     if (node.FindValue("cps"))
         cps = node["cps"].to<uint64_t>();
 
+    if (node.FindValue("new_maxever_command"))
+	    node["new_maxever_command"] >> new_maxever_command;
+
     if (node.FindValue("threaded"))
         threaded = node["threaded"].to<bool>();
-
+    
     memset(buffer[0], 0, sizeof(uint64_t) * buffer_size);
     memset(buffer[1], 0, sizeof(uint64_t) * buffer_size);
     memset(log_diff, 0, sizeof(uint64_t) * buffer_size);
@@ -86,6 +90,9 @@ jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node)
     // set state to init
     state = module_state_init;
 
+    is_printing = false;
+    maxever_time_string[0] = 0;
+	    
     calibrate();
 }
 
@@ -168,24 +175,37 @@ void jitter_measurement::calibrate() {
 /*!
  * if log buffer is full, output thread is triggered
  */
-void jitter_measurement::measure() {
-#if !defined(NO_RDTSC)
-    pdin.last_ts = __rdtsc();
-#else
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    pdin.last_ts = (uint64_t)(ts.tv_sec * 1e9 + ts.tv_nsec);
-#endif
-    buffer[buffer_act][buffer_pos++] = pdin.last_ts;
-    if (buffer_pos >= buffer_size) {
-        buffer_pos = 0;
-        buffer_act = (buffer_act + 1) % 2; 
 
-        if (threaded)
-            pthread_cond_signal(&sync_cond);
-        else print();
-    }
-    trigger_modules();
+inline double get_seconds() {
+	struct timespec ts;
+	clock_gettime(CLOCK_REALTIME, &ts);
+	return (double)ts.tv_sec + 1e-9 * ts.tv_nsec;
+}
+
+inline uint64_t get_timestamp() {
+#if !defined(NO_RDTSC)
+	return __rdtsc();
+#else
+	struct timespec ts;
+	clock_gettime(CLOCK_REALTIME, &ts);
+	return (uint64_t)(ts.tv_sec * 1e9 + ts.tv_nsec);
+#endif
+}
+
+void jitter_measurement::measure() {
+	pdin.last_ts = get_timestamp();
+	
+	buffer[buffer_act][buffer_pos++] = pdin.last_ts;
+	if (buffer_pos >= buffer_size) {
+		buffer_pos = 0;
+		buffer_act = (buffer_act + 1) % 2; 
+		
+		if (threaded)
+			pthread_cond_signal(&sync_cond);
+		else
+			print();
+	}
+	trigger_modules();
 }
 
 //! returns last measuremente
@@ -226,33 +246,67 @@ void jitter_measurement::print() {
     }
     cycle /= buffer_size - 1;
 
-    // calculating maximum deviation 
+    // calculating maximum deviation
+    double fac = (1E6 / (double)cps);
+    uint64_t new_maxever_time = 0;
     for (i = 0; i < buffer_size - 1; i++) {
         dev     = labs(log_diff[i] - cycle); 
         maxjit  = max(dev, maxjit);
+	uint64_t this_maxjit = (uint64_t)(maxjit * fac);
+	if(this_maxjit > pdin.maxever) {
+		// new max ever!
+		pdin.maxever = this_maxjit;
+		new_maxever_time = buffer[act_buf][i];
+	}
         avgjit += (dev * dev);
     }
     avgjit /= (buffer_size - 1);
 
-    double fac = (1E6 / (double)cps);
     avgjit = (uint64_t)(sqrt((double)avgjit) * fac);
     cycle  = (uint64_t)(cycle  * fac);
     maxjit = (uint64_t)(maxjit * fac);
     pdin.last_cycle = cycle;
     pdin.last_max = maxjit;
-    pdin.maxever = max(pdin.maxever, maxjit);
+
+    if(new_maxever_time) {
+	    double seconds_ago = (get_timestamp() - new_maxever_time) / (double)cps;
+	    pdin.maxever_time = get_seconds() - seconds_ago;
+	    time_t int_ts = (int)pdin.maxever_time;
+	    struct tm* btime = localtime(&int_ts);
+	    strftime(maxever_time_string, 64, " (at %H:%M:%S", btime);
+	    unsigned int part_second = 10000 * (pdin.maxever_time - (int)pdin.maxever_time);
+	    if(part_second >= 10000)
+		    part_second = 9999;
+	    snprintf(maxever_time_string + strlen(maxever_time_string), 32, ".%04d", part_second);
+    }
+	    
     if(pdout.max_ever_clamp != 0 && pdin.maxever > pdout.max_ever_clamp)
         pdin.maxever = pdout.max_ever_clamp;
 
+    char running_maxever_time_string[128];
+    if(maxever_time_string[0] == 0)
+	    running_maxever_time_string[0] = 0;
+    else
+	    snprintf(running_maxever_time_string, 128, "%s, %.1fs ago)",
+		     maxever_time_string,
+		     get_seconds() - pdin.maxever_time);
+    
     jm_log(name, info, "mean period: %4lluus, jitter mean:"
-            " %2lluus, max %3lluus, max ever %3lluus\n",
-            cycle, avgjit, maxjit, pdin.maxever);
+            " %2lluus, max %4lluus, max ever %4lluus%s\n",
+	   cycle, avgjit, maxjit, pdin.maxever, running_maxever_time_string);
+
+    if(new_maxever_time && new_maxever_command.size()) {
+	    string cmd = format_string("%s %llu %s",
+				       new_maxever_command.c_str(), pdin.maxever, maxever_time_string + 5);
+	    jm_log(name, info, "execute new_maxever_command: %s\n", cmd.c_str());
+	    system(cmd.c_str());
+    }
+	   
 }
 
 //! handler function called if thread is running
 void jitter_measurement::run() {
-    jm_log(name, info, "handler running\n");
-    calibrate();
+	// calibrate();
 
     pthread_mutex_lock(&sync_lock);
 
@@ -267,8 +321,6 @@ void jitter_measurement::run() {
     }
 
     pthread_mutex_unlock(&sync_lock);
-
-    jm_log(name, info, "handler stopped\n");
 }
 
 //! service callbacks
@@ -276,6 +328,8 @@ int jitter_measurement::on_reset_max_ever(ln::service_request& req,
         ln_service_robotkernel_jitter_measurement_reset_max_ever& svc) {
     svc.resp.maxever = pdin.maxever;
     pdin.maxever = 0;
+    pdin.maxever_time = 0;
+    maxever_time_string[0] = 0;
     req.respond();
     return 0;
 }
