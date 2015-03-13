@@ -73,6 +73,7 @@ class jitter_measurement :
 	bool is_printing;
 	char maxever_time_string[64];
 	std::string new_maxever_command;
+	unsigned int new_maxever_command_threshold;
 	
 	struct jitter_pdin {
 		uint64_t maxever;         //! max ever seen jitter

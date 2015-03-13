@@ -76,6 +76,11 @@ jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node)
     if (node.FindValue("new_maxever_command"))
 	    node["new_maxever_command"] >> new_maxever_command;
 
+    if(node.FindValue("new_maxever_command_threshold"))
+	    node["new_maxever_command_threshold"] >> new_maxever_command_threshold;
+    else
+	    new_maxever_command_threshold = 50; // us
+
     if (node.FindValue("threaded"))
         threaded = node["threaded"].to<bool>();
     
@@ -295,7 +300,7 @@ void jitter_measurement::print() {
             " %2lluus, max %4lluus, max ever %4lluus%s\n",
 	   cycle, avgjit, maxjit, pdin.maxever, running_maxever_time_string);
 
-    if(new_maxever_time && new_maxever_command.size()) {
+    if(new_maxever_time && new_maxever_command.size() && pdin.maxever > new_maxever_command_threshold) {
 	    string cmd = format_string("%s %llu %s",
 				       new_maxever_command.c_str(), pdin.maxever, maxever_time_string + 5);
 	    jm_log(name, info, "execute new_maxever_command: %s\n", cmd.c_str());

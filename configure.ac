@@ -13,6 +13,8 @@ if test -n "$SOURCE_ENV"; then
    source $SOURCE_ENV
 fi
 
+m4_ifdef([AM_PROG_AR], [AM_PROG_AR])
+
 # Checks for programs.
 AC_PROG_CXX
 AC_PROG_AWK
@@ -51,12 +53,47 @@ AC_SUBST(ARCH_CFLAGS)
 PKG_CHECK_MODULES([ROBOTKERNEL], [robotkernel], [], [
                     RMPM_CHECK_MODULES([ROBOTKERNEL], [robotkernel.robotkernel])
                    ])
-LN_BASE=$(env -i "$srcdir"/scripts/get_ln_base.py $ROBOTKERNEL_DEPENDS)
-LN_GENERATE_ARGS='-md_dir $(srcdir)/message_definitions'
-LN_GENERATE="env -i $LN_BASE/scripts/ln_generate $LN_GENERATE_ARGS"
 
-AC_SUBST(LN_BASE)
+# try to automatically find ln
+LN_GENERATE_ARGS='-md_dir $(srcdir)/message_definitions'
+if test "${LN_LIBS}" == ""; then
+    if test -n "${LN_BASE}"; then
+        AC_CHECK_HEADER(${LN_BASE}/include/ln.h, [ 
+                # found it in release dir!
+                LN_LIBS="-L${LN_BASE}/lib/$rmpm_host -lln"
+                LN_CFLAGS="-I${LN_BASE}/include/"
+                LN_GENERATE="env -i ${LN_BASE}/scripts/ln_generate $LN_GENERATE_ARGS"
+                LN_YAMLCPP_LIBS="-L${LN_BASE}/lib/$rmpm_host -lyaml-cpp"
+                STRING_UTILS_LIBS="-L$LN_BASE/lib/$rmpm_host -lstring_util"
+            ], [
+                # not found...
+                AC_CHECK_HEADER(${LN_BASE}/library/include/ln.h, [
+                        # found it in source dir!
+			echo "found LN in source dir!"
+                        LN_LIBS="-L${LN_BASE}/library/obj/$rmpm_host -lln"
+                        LN_CFLAGS="-I${LN_BASE}/library/include/ -I${LN_BASE}/contrib/libstring_util/include"
+                        LN_GENERATE="env -i ${LN_BASE}/library/tools/ln_generate $LN_GENERATE_ARGS"
+                        LN_YAMLCPP_CFLAGS="-I${LN_BASE}/contrib/libyaml/include"
+                        LN_YAMLCPP_LIBS="-L${LN_BASE}/contrib/libyaml/lib/$rmpm_host -lyaml-cpp"
+                        STRING_UTILS_LIBS="-L$LN_BASE/contrib/libstring_util/obj/$rmpm_host -lstring_util"
+                    ])
+            ])
+    fi
+fi
+
+# try to find ln via pkg-config and rmpm, if not already done in above step
+PKG_CHECK_MODULES([LN], [libln], [], [
+                    RMPM_CHECK_MODULES([LN], [software.links_and_nodes])
+                    LN_GENERATE="env -i $LN_BASE/scripts/ln_generate $LN_GENERATE_ARGS"
+                    STRING_UTILS_LIBS="-L$LN_BASE/lib/$rmpm_host -lstring_util"
+                   ])
+AM_CONDITIONAL([HAVE_LN], [test -n "$LN_LIBS"])
 AC_SUBST(LN_GENERATE)
+AC_DEFINE_UNQUOTED(LN_LIBS, "$LN_LIBS", [linked links and nodes library])
+AC_SUBST(LN_LIBS)
+AC_SUBST(LN_VERSION)
+AC_SUBST(YAML_VERSION)
+AC_SUBST(STRING_UTILS_LIBS)
 
 AC_DEFINE_UNQUOTED(BUILD_DATE,"`date -u`",[Date (usually date of extraction from SVN).])
 AC_DEFINE_UNQUOTED(BUILD_USER,"`whoami`",[User (usually user logged in on shell).])
