@@ -2,10 +2,11 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.63])
-AC_INIT([module_jitter_measurement], [3.1.2], [Robert Burger <robert.burger@dlr.de>])
+AC_INIT([module_jitter_measurement], [3.1.3], [Robert Burger <robert.burger@dlr.de>])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([m4])
+m4_include([scripts/m4/rmpm.m4])
 
 # load env-file with each make invocation
 if test -n "$SOURCE_ENV"; then
