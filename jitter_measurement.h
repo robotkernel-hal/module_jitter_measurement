@@ -25,15 +25,13 @@
 #ifndef __JITTER_MEASSUREMENT_H__
 #define __JITTER_MEASSUREMENT_H__
 
-#include "module_jitter_measurement.h"
-
 #define LN_UNREGISTER_SERVICE_IN_BASE_DETOR  
 #include "ln_messages.h"
 #undef LN_UNREGISTER_SERVICE_IN_BASE_DETOR
 
 #include "robotkernel/runnable.h"
 #include "robotkernel/trigger_base.h"
-#include "config.h"
+//#include "config.h"
 
 #include "yaml-cpp/yaml.h"
 
@@ -70,22 +68,22 @@ class jitter_measurement :
         size_t buffer_size;       //! size of jitter measurement buffer
         robotkernel::kernel::interface_id_t pd_interface_id;
         bool threaded;
-	bool is_printing;
-	char maxever_time_string[64];
-	std::string new_maxever_command;
-	unsigned int new_maxever_command_threshold;
-	
-	struct jitter_pdin {
-		uint64_t maxever;         //! max ever seen jitter
-		uint64_t last_max;
-		uint64_t last_cycle;
-		uint64_t last_ts;
-		double maxever_time; // unix timestamp of last maxever increment!
-	} pdin;
-	
-	struct jitter_pdout {
-		uint64_t max_ever_clamp;
-	} pdout;
+        bool is_printing;
+        char maxever_time_string[64];
+        std::string new_maxever_command;
+        unsigned int new_maxever_command_threshold;
+
+        struct jitter_pdin {
+            uint64_t maxever;         //! max ever seen jitter
+            uint64_t last_max;
+            uint64_t last_cycle;
+            uint64_t last_ts;
+            double maxever_time; // unix timestamp of last maxever increment!
+        } pdin;
+
+        struct jitter_pdout {
+            uint64_t max_ever_clamp;
+        } pdout;
 
         //! yaml config construction
         /*!
@@ -96,6 +94,28 @@ class jitter_measurement :
 
         //! default destruction
         ~jitter_measurement();
+
+        //! set module state
+        /*
+         * \param state module state to set
+         * \return 0 on success
+         */
+        int set_state(module_state_t state);
+
+        //! get module state
+        /*
+         * \return actual module state
+         */
+        module_state_t get_state() { return state; }
+
+        //! send a request to module
+        /*! 
+          \param hdl module handle
+          \param reqcode request code
+          \param ptr pointer to request structure
+          \return success or failure
+          */
+        int request(int reqcode, void* ptr);
 
         //! register services
         void register_services();
@@ -119,6 +139,8 @@ class jitter_measurement :
                 ln_service_robotkernel_jitter_measurement_reset_max_ever& svc);
         int on_get_cps(ln::service_request& req, 
                 ln_service_robotkernel_jitter_measurement_get_cps& svc);
+
+        void log(robotkernel::loglevel lvl, const char *format, ...);
 };
 
 #endif // __JITTER_MEASSUREMENT_H__

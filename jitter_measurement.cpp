@@ -24,7 +24,7 @@
 
 #include "jitter_measurement.h"
 #include "robotkernel/kernel.h"
-#include "config.h"
+//#include "config.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
@@ -157,7 +157,7 @@ void jitter_measurement::calibrate() {
     buffer_pos  = 0;
     memset(&pdin, 0, sizeof(pdin));
 #if !defined(NO_RDTSC)
-    jm_log(name, info, "calibrating clocks/sec...\n");
+    log(module_info, "calibrating clocks/sec...\n");
 
 #ifdef __VXWORKS__
     taskDelay(1);
@@ -170,7 +170,7 @@ void jitter_measurement::calibrate() {
     nanosleep(&ts, NULL);
     cps = (__rdtsc() - begin) * 98.3; // magic factor to correct cps
 #endif
-    jm_log(name, info, "got %llu clock/sec\n", cps);
+    log(module_info, "got %llu clock/sec\n", cps);
 #else
     cps = 1e9;
 #endif
@@ -296,14 +296,14 @@ void jitter_measurement::print() {
 		     maxever_time_string,
 		     get_seconds() - pdin.maxever_time);
     
-    jm_log(name, info, "mean period: %4lluus, jitter mean:"
+    log(module_info, "mean period: %4lluus, jitter mean:"
             " %2lluus, max %4lluus, max ever %4lluus%s\n",
 	   cycle, avgjit, maxjit, pdin.maxever, running_maxever_time_string);
 
     if(new_maxever_time && new_maxever_command.size() && pdin.maxever > new_maxever_command_threshold) {
 	    string cmd = format_string("%s %llu %s",
 				       new_maxever_command.c_str(), pdin.maxever, maxever_time_string + 5);
-	    jm_log(name, info, "execute new_maxever_command: %s\n", cmd.c_str());
+	    log(module_info, "execute new_maxever_command: %s\n", cmd.c_str());
 	    system(cmd.c_str());
     }
 	   
@@ -346,3 +346,86 @@ int jitter_measurement::on_get_cps(ln::service_request& req,
     return 0;
 }
 
+int jitter_measurement::set_state(module_state_t state) {
+    log(module_info, "state change form %s to %s requested\n", 
+            state_to_string(this->state), state_to_string(state));
+
+    switch (state) {
+        case module_state_init:
+            stop();
+            unregister_pd();
+            break;
+        case module_state_preop:
+            register_pd();
+            if (threaded)
+                start();
+            break;
+        case module_state_safeop:
+            break;
+        case module_state_op:
+
+            if (this->state < module_state_safeop)
+                // invalid state transition
+                return -1;
+            break;
+        default:
+            // invalid state
+            return -1;
+    }
+
+    // set actual state
+    this->state = state;
+
+    return 0;
+}
+        
+int jitter_measurement::request(int reqcode, void* ptr) {
+    int ret = 0;
+
+    switch (reqcode) {
+        case MOD_REQUEST_REGISTER_SERVICES:
+            register_services();
+            break;
+        case MOD_REQUEST_GET_PDIN: {
+            process_data_t *pdg = (process_data_t *)ptr;
+            pdg->pd = &pdin;
+            pdg->len = sizeof(pdin);
+            break;
+        }
+        case MOD_REQUEST_GET_PDOUT: {
+            process_data_t *pdg = (process_data_t *)ptr;
+            pdg->pd = &pdout;
+            pdg->len = sizeof(pdout);
+            break;
+        }
+        case MOD_REQUEST_SET_TRIGGER_CB: {
+            set_trigger_cb_t *cb = (set_trigger_cb_t *)ptr;
+            if (!add_trigger_module(*cb))
+                ret = -1;
+            break;
+        }
+        case MOD_REQUEST_UNSET_TRIGGER_CB: {
+            set_trigger_cb_t *cb = (set_trigger_cb_t *)ptr;
+            if (!remove_trigger_module(*cb))
+                ret = -1;
+            break;
+        }
+        default:
+            log(module_verbose, "not implemented request %d\n", reqcode);
+            ret = -1;
+            break;
+    }
+
+    return ret;
+}
+
+//! log to kernel logging facility
+void jitter_measurement::log(robotkernel::loglevel lvl, const char *format, ...) {
+    char buf[1024];
+
+    // format argument list
+    va_list args;
+    va_start(args, format);
+    vsnprintf(buf, 1024, format, args);
+    klog(lvl, "[module_jitter_measurement|%s] %s", name.c_str(), buf);
+}

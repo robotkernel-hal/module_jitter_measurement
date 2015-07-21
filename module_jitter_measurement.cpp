@@ -3,27 +3,15 @@
   $Id$
   */
 
-#include "module_jitter_measurement.h"
+//#include "config.h"
 #include "jitter_measurement.h"
-#include "config.h"
 #include "robotkernel/kernel.h"
+#include "robotkernel/exceptions.h"
 
 #include "yaml-cpp/yaml.h"
 
 using namespace std;
 using namespace robotkernel;
-
-//! log to kernel logging facility
-void jm_log(std::string mod_name, robotkernel::loglevel lvl, const char *format, ...) {
-    char buf[1024];
-
-    // format argument list
-    va_list args;
-    va_start(args, format);
-    vsnprintf(buf, 1024, format, args);
-    klog(lvl, "[module_jitter_measurement|%s] %s", mod_name.c_str(), buf);
-}
-
 
 #ifdef __cplusplus
 extern "C" {
@@ -40,15 +28,15 @@ extern "C" {
 MODULE_HANDLE mod_configure(const char* name, const char* config) {
     jitter_measurement *j = NULL;
 
-    jm_log(string(name), info, "build by: " BUILD_USER "@" BUILD_HOST "\n");
-    jm_log(string(name), info, "build date: " BUILD_DATE "\n");
+    klog(module_info, "[module_jitter_measurement|%s] build by: " BUILD_USER "@" BUILD_HOST "\n", name);
+    klog(module_info, "[module_jitter_measurement|%s] build date: " BUILD_DATE "\n", name);
 
     stringstream stream(config);
     YAML::Parser parser(stream);
     YAML::Node doc;
 
     if (!parser.GetNextDocument(doc)) {
-        jm_log(string(name), error, "error parsing config file\n");
+        klog(module_error, "[module_jitter_measurement|%s] error parsing config file\n", name);
         goto ErrorExit;
     }
 
@@ -56,14 +44,14 @@ MODULE_HANDLE mod_configure(const char* name, const char* config) {
     try {
         j = new jitter_measurement(name, doc);
         if (!j) {
-            jm_log(string(name), error, "cannot allocate memory: %s\n",
-                    strerror(errno));
+            klog(module_error, "[module_jitter_measurement|%s] cannot allocate memory: %s\n",
+                    name, strerror(errno));
             goto ErrorExit;
         }
-        jm_log(string(name), info, "configured buffer_size %d\n", j->buffer_size);
+        klog(module_info, "[module_jitter_measurement|%s] configured buffer_size %d\n", name, j->buffer_size);
     } catch (YAML::Exception& e) {
-        jm_log(string(name), error, "exception creating: %s\n", e.what());
-        jm_log(string(name), error, "got config string: \n====\n%s\n====\n", config);
+        klog(module_error, "[module_jitter_measurement|%s| exception creating: %s\n", name, e.what());
+        klog(module_error, "[module_jitter_measurement|%s] got config string: \n====\n%s\n====\n", name, config);
         return (MODULE_HANDLE)NULL;
     }
 
@@ -83,12 +71,11 @@ ErrorExit:
   \return success or failure
   */
 int mod_unconfigure(MODULE_HANDLE hdl) {
-    // cast struct
-    jitter_measurement *j = (jitter_measurement *)hdl;
-
-    if (j)
-        delete j;
-
+    jitter_measurement *jm_dev = reinterpret_cast<jitter_measurement *>(hdl);
+    if (!jm_dev)
+        throw robotkernel::str_exception("[module_jitter_measurement] invalid module "
+                "handle to <jitter_measurement *>\n");
+    delete jm_dev;
     return 0;
 }
 
@@ -99,38 +86,12 @@ int mod_unconfigure(MODULE_HANDLE hdl) {
   \return success or failure
   */
 int mod_set_state(MODULE_HANDLE hdl, module_state_t state) {
-    // cast struct
-    jitter_measurement *j = (jitter_measurement *)hdl;
-    jm_log(j->name, info, "state change form %s to %s requested\n", 
-            state_to_string(j->state), state_to_string(state));
+    jitter_measurement *jm_dev = reinterpret_cast<jitter_measurement *>(hdl);
+    if (!jm_dev)
+        throw robotkernel::str_exception("[module_jitter_measurement] invalid module "
+                "handle to <jitter_measurement *>\n");
 
-    switch (state) {
-        case module_state_init:
-            j->stop();
-            j->unregister_pd();
-            break;
-        case module_state_preop:
-            j->register_pd();
-            if (j->threaded)
-                j->start();
-            break;
-        case module_state_safeop:
-            break;
-        case module_state_op:
-
-            if (j->state < module_state_safeop)
-                // invalid state transition
-                return -1;
-            break;
-        default:
-            // invalid state
-            return -1;
-    }
-
-    // set actual state
-    j->state = state;
-
-    return 0;
+    return jm_dev->set_state(state);
 }
 
 //! get module state machine state
@@ -139,9 +100,12 @@ int mod_set_state(MODULE_HANDLE hdl, module_state_t state) {
   \return current state
   */
 module_state_t mod_get_state(MODULE_HANDLE hdl) {
-    // cast struct and return state
-    jitter_measurement *j = (jitter_measurement *)hdl;
-    return j->state;
+    jitter_measurement *jm_dev = reinterpret_cast<jitter_measurement *>(hdl);
+    if (!jm_dev)
+        throw robotkernel::str_exception("[module_jitter_measurement] invalid module "
+                "handle to <jitter_measurement *>\n");
+
+    return jm_dev->get_state();
 }
 
 //! module trigger callback
@@ -149,9 +113,12 @@ module_state_t mod_get_state(MODULE_HANDLE hdl) {
  * \param hdl module handle
  */
 void mod_trigger(MODULE_HANDLE hdl) {
-    // cast struct
-    jitter_measurement *j = (jitter_measurement *)hdl;
-    j->measure();
+    jitter_measurement *jm_dev = reinterpret_cast<jitter_measurement *>(hdl);
+    if (!jm_dev)
+        throw robotkernel::str_exception("[module_jitter_measurement] invalid module "
+                "handle to <jitter_measurement *>\n");
+
+    jm_dev->measure();
 }
 
 //! send a request to module
@@ -162,46 +129,12 @@ void mod_trigger(MODULE_HANDLE hdl) {
   \return success or failure
   */
 int mod_request(MODULE_HANDLE hdl, int reqcode, void* ptr) {
-    int ret = 0;
+    jitter_measurement *jm_dev = reinterpret_cast<jitter_measurement *>(hdl);
+    if (!jm_dev)
+        throw robotkernel::str_exception("[module_jitter_measurement] invalid module "
+                "handle to <jitter_measurement *>\n");
 
-    // cast struct
-    jitter_measurement *j = (jitter_measurement *)hdl;
-
-    switch (reqcode) {
-        case MOD_REQUEST_REGISTER_SERVICES:
-            j->register_services();
-            break;
-        case MOD_REQUEST_GET_PDIN: {
-            process_data_t *pdg = (process_data_t *)ptr;
-            pdg->pd = &j->pdin;
-            pdg->len = sizeof(j->pdin);
-            break;
-        }
-        case MOD_REQUEST_GET_PDOUT: {
-            process_data_t *pdg = (process_data_t *)ptr;
-            pdg->pd = &j->pdout;
-            pdg->len = sizeof(j->pdout);
-            break;
-        }
-        case MOD_REQUEST_SET_TRIGGER_CB: {
-            set_trigger_cb_t *cb = (set_trigger_cb_t *)ptr;
-            if (!j->add_trigger_module(*cb))
-                ret = -1;
-            break;
-        }
-        case MOD_REQUEST_UNSET_TRIGGER_CB: {
-            set_trigger_cb_t *cb = (set_trigger_cb_t *)ptr;
-            if (!j->remove_trigger_module(*cb))
-                ret = -1;
-            break;
-        }
-        default:
-            jm_log(j->name, verbose, "not implemented request %d\n", reqcode);
-            ret = -1;
-            break;
-    }
-
-    return ret;
+    return jm_dev->request(reqcode, ptr);
 }
 
 #if 0
