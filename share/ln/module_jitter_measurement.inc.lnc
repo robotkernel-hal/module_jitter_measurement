@@ -6,8 +6,6 @@ requires_version 0.2.43
 #     defaults to rmpm structure
 #   module_jitter_measurement_libdir
 #     (optional) add custom module search paths
-#   module_jitter_measurement_mds
-#     (optional) add custom message definition paths
 
 defines
 module_jitter_measurement_base: %(dirname %(dirname %(CURDIR)))
@@ -17,7 +15,4 @@ add_message_definition_dir: %(module_jitter_measurement_base)/share/message_defi
 
 ifndef rk_modules: rk_modules: ""
 rk_modules: %(rk_modules):%(module_jitter_measurement_libdir)
-
-ifndef rk_mds: rk_mds: ""
-ifndef module_jitter_measurement_mds: rk_mds: %(rk_mds):%(module_jitter_measurement_mds)
 
