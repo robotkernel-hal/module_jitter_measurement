@@ -1,4 +1,4 @@
-//! ÜBER-control Module jitter_measurement
+//! robotkernel module jitter_measurement
 /*!
  * author: Robert Burger
  *
@@ -22,8 +22,8 @@
  * along with robotkernel.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __JITTER_MEASSUREMENT_H__
-#define __JITTER_MEASSUREMENT_H__
+#ifndef __MODULE_JITTER_MEASSUREMENT_H__
+#define __MODULE_JITTER_MEASSUREMENT_H__
 
 #define LN_UNREGISTER_SERVICE_IN_BASE_DETOR  
 #include "ln_messages.h"
@@ -31,13 +31,16 @@
 
 #include "robotkernel/runnable.h"
 #include "robotkernel/trigger_base.h"
-//#include "config.h"
+#include "robotkernel/module_base.h"
 
 #include "yaml-cpp/yaml.h"
+
+namespace module_jitter_measurement {
 
 class jitter_measurement :
     public robotkernel::runnable,
     public robotkernel::trigger_base,
+    public robotkernel::module_base,
     public ln_service_reset_max_ever_base,
     public ln_service_get_cps_base {
 
@@ -62,9 +65,6 @@ class jitter_measurement :
         void run();
 
     public:
-
-        module_state_t state;     //! module state
-        std::string name;         //! jitter_measurement name
         size_t buffer_size;       //! size of jitter measurement buffer
         robotkernel::kernel::interface_id_t pd_interface_id;
         bool threaded;
@@ -102,12 +102,6 @@ class jitter_measurement :
          */
         int set_state(module_state_t state);
 
-        //! get module state
-        /*
-         * \return actual module state
-         */
-        module_state_t get_state() { return state; }
-
         //! send a request to module
         /*! 
           \param hdl module handle
@@ -122,11 +116,12 @@ class jitter_measurement :
         void register_pd();
         void unregister_pd();
 
-        //! does one measurement
-        /*!
+        //! module trigger callback
+        /*! does one measurement
+         *
          * if log buffer is full, output thread is triggered
          */
-        void measure();
+        void trigger();
 
         //! calibrate function for clocks per second
         void calibrate();
@@ -139,9 +134,9 @@ class jitter_measurement :
                 ln_service_robotkernel_jitter_measurement_reset_max_ever& svc);
         int on_get_cps(ln::service_request& req, 
                 ln_service_robotkernel_jitter_measurement_get_cps& svc);
-
-        void log(robotkernel::loglevel lvl, const char *format, ...);
 };
 
-#endif // __JITTER_MEASSUREMENT_H__
+};
+
+#endif // __MODULE_JITTER_MEASSUREMENT_H__
 

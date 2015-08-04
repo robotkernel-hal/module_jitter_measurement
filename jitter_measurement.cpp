@@ -1,4 +1,4 @@
-//! ÜBER-control Module jitter_measurement
+//! robotkernel module jitter_measurement
 /*!
  * author: Robert Burger
  *
@@ -23,8 +23,7 @@
  */
 
 #include "jitter_measurement.h"
-#include "robotkernel/kernel.h"
-//#include "config.h"
+
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
@@ -38,8 +37,11 @@
 #include "yaml-cpp/yaml.h"
 #include <string_util/string_util.h>
 
+MODULE_DEF(module_jitter_measurement, module_jitter_measurement::jitter_measurement)
+
 using namespace std;
 using namespace robotkernel;
+using namespace module_jitter_measurement;
 
 #if !defined(NO_RDTSC)
 uint64_t __rdtsc(void) {
@@ -55,9 +57,8 @@ uint64_t __rdtsc(void) {
  * \param node yaml node
  */
 jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node) 
-: runnable(0, 0) {
+: runnable(0, 0), module_base("module_jitter_measurement", name) {
     buffer_size = node["buffer_size"].to<unsigned int>();
-    this->name = string(name);
 
     buffer[0]       = new uint64_t[buffer_size];
     buffer[1]       = new uint64_t[buffer_size];
@@ -197,7 +198,7 @@ inline uint64_t get_timestamp() {
 #endif
 }
 
-void jitter_measurement::measure() {
+void jitter_measurement::trigger() {
 	pdin.last_ts = get_timestamp();
 	
 	buffer[buffer_act][buffer_pos++] = pdin.last_ts;
@@ -315,7 +316,7 @@ void jitter_measurement::run() {
 
     pthread_mutex_lock(&sync_lock);
 
-    while (_running) {
+    while (running()) {
         struct timespec ts;
         clock_gettime(CLOCK_REALTIME, &ts);
         ts.tv_sec++;
@@ -347,7 +348,7 @@ int jitter_measurement::on_get_cps(ln::service_request& req,
 }
 
 int jitter_measurement::set_state(module_state_t state) {
-    log(module_info, "state change form %s to %s requested\n", 
+    log(module_info, "state change from %s to %s requested\n", 
             state_to_string(this->state), state_to_string(state));
 
     switch (state) {
@@ -381,6 +382,8 @@ int jitter_measurement::set_state(module_state_t state) {
         
 int jitter_measurement::request(int reqcode, void* ptr) {
     int ret = 0;
+    if (trigger_base::request(reqcode, ptr) == 0)
+        return 0;
 
     switch (reqcode) {
         case MOD_REQUEST_REGISTER_SERVICES:
@@ -398,18 +401,6 @@ int jitter_measurement::request(int reqcode, void* ptr) {
             pdg->len = sizeof(pdout);
             break;
         }
-        case MOD_REQUEST_SET_TRIGGER_CB: {
-            set_trigger_cb_t *cb = (set_trigger_cb_t *)ptr;
-            if (!add_trigger_module(*cb))
-                ret = -1;
-            break;
-        }
-        case MOD_REQUEST_UNSET_TRIGGER_CB: {
-            set_trigger_cb_t *cb = (set_trigger_cb_t *)ptr;
-            if (!remove_trigger_module(*cb))
-                ret = -1;
-            break;
-        }
         default:
             log(module_verbose, "not implemented request %d\n", reqcode);
             ret = -1;
@@ -419,13 +410,3 @@ int jitter_measurement::request(int reqcode, void* ptr) {
     return ret;
 }
 
-//! log to kernel logging facility
-void jitter_measurement::log(robotkernel::loglevel lvl, const char *format, ...) {
-    char buf[1024];
-
-    // format argument list
-    va_list args;
-    va_start(args, format);
-    vsnprintf(buf, 1024, format, args);
-    klog(lvl, "[module_jitter_measurement|%s] %s", name.c_str(), buf);
-}
