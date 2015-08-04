@@ -23,6 +23,7 @@
  */
 
 #include "jitter_measurement.h"
+#include "robotkernel/helpers.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -65,26 +66,17 @@ jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node)
     log_diff        = new uint64_t[buffer_size];
     buffer_pos      = 0;
     buffer_act      = 0;
-    cps             = 1;
+    cps             = get_as<uint64_t>(node, "cps", 1);
     pd_interface_id = NULL;
-    threaded        = true;
+    threaded        = get_as<bool>(node, "threaded", true);
     pdout.max_ever_clamp = 0; // disable clamp
     memset(&pdin, 0, sizeof(pdin));
 
-    if (node.FindValue("cps"))
-        cps = node["cps"].to<uint64_t>();
+    new_maxever_command = 
+        get_as<string>(node, "new_maxever_command", string(""));
+    new_maxever_command_threshold = 
+        get_as<int>(node, "new_maxever_command_threshold", 50);
 
-    if (node.FindValue("new_maxever_command"))
-	    node["new_maxever_command"] >> new_maxever_command;
-
-    if(node.FindValue("new_maxever_command_threshold"))
-	    node["new_maxever_command_threshold"] >> new_maxever_command_threshold;
-    else
-	    new_maxever_command_threshold = 50; // us
-
-    if (node.FindValue("threaded"))
-        threaded = node["threaded"].to<bool>();
-    
     memset(buffer[0], 0, sizeof(uint64_t) * buffer_size);
     memset(buffer[1], 0, sizeof(uint64_t) * buffer_size);
     memset(log_diff, 0, sizeof(uint64_t) * buffer_size);
