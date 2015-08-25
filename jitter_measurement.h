@@ -35,7 +35,21 @@
 
 #include "yaml-cpp/yaml.h"
 
+#undef BUILD_DATE
+#undef BUILD_HOST
+#undef BUILD_USER
+#undef PACKAGE
+#undef PACKAGE_BUGREPORT
+#undef PACKAGE_NAME
+#undef PACKAGE_STRING
+#undef PACKAGE_TARNAME
+#undef PACKAGE_VERSION
+#undef VERSION
+#include "config.h"
+
+#ifdef HAVE_TERMIOS_H
 #include "tty_control_signals.h"
+#endif
 
 namespace module_jitter_measurement {
 
@@ -74,7 +88,9 @@ class jitter_measurement :
         char maxever_time_string[64];
         std::string new_maxever_command;
         unsigned int new_maxever_command_threshold;
+#ifdef HAVE_TERMIOS_H
 	tty_control_signals* tty_port;
+#endif
 	enum pulse_signals_t {
 		NO_PULSE,
 		PULSE_RTS,

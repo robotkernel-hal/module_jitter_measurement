@@ -96,7 +96,7 @@ AC_DEFINE_UNQUOTED(BUILD_USER,"`whoami`",[User (usually user logged in on shell)
 AC_DEFINE_UNQUOTED(BUILD_HOST,"`hostname`",[Hostname (build host).])
 
 # Checks for header files.
-AC_CHECK_HEADERS([stdlib.h string.h])
+AC_CHECK_HEADERS([stdlib.h string.h termios.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_TYPE_SIZE_T

@@ -70,8 +70,6 @@ jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node)
     threaded        = get_as<bool>(node, "threaded", true);
     pdout.max_ever_clamp = 0; // disable clamp
     memset(&pdin, 0, sizeof(pdin));
-    tty_port = NULL;
-
     new_maxever_command = 
         get_as<string>(node, "new_maxever_command", string(""));
     new_maxever_command_threshold = 
@@ -94,6 +92,7 @@ jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node)
     pulse_on_trigger = NO_PULSE;
     pulse_on_new_max_ever = NO_PULSE;
     const YAML::Node* tty_node = node.FindValue("tty_control_signals");
+#ifdef HAVE_TERMIOS_H	    
     if(tty_node) {
 	    string port = get_as<string>(*tty_node, "port", "/dev/ttyS0");
 	    tty_port = new tty_control_signals(port.c_str());
@@ -101,7 +100,12 @@ jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node)
 	    set_pulse_from_string(&pulse_on_trigger, on_trigger);
 	    string on_new_me = get_as<string>(*tty_node, "pulse_on_new_max_ever", "");
 	    set_pulse_from_string(&pulse_on_new_max_ever, on_new_me);
-    }
+    } else
+	    tty_port = NULL;
+#else
+    if(tty_node) 
+	    log(module_error, "tty_control_signals not supported on this architecture!\n");
+#endif
     
     calibrate();
 }
@@ -116,9 +120,10 @@ jitter_measurement::~jitter_measurement() {
     if (log_diff)
         delete[] log_diff;
 
+#ifdef HAVE_TERMIOS_H	    
     if(tty_port)
 	    delete tty_port;
-    
+#endif    
     // destroy ipc structures
     pthread_mutex_destroy(&sync_lock);
     pthread_cond_destroy(&sync_cond);
@@ -135,6 +140,7 @@ void jitter_measurement::set_pulse_from_string(pulse_signals_t* which, std::stri
 		*which = PULSE_DTR_NEG;
 }
 void jitter_measurement::do_pulse(pulse_signals_t which) {
+#ifdef HAVE_TERMIOS_H	    
 	switch(which) {
 	case PULSE_RTS:
 		tty_port->pulse_rts();
@@ -151,6 +157,7 @@ void jitter_measurement::do_pulse(pulse_signals_t which) {
 	case NO_PULSE:
 		break;
 	}
+#endif
 }
 
 //! register services
@@ -319,7 +326,7 @@ void jitter_measurement::print() {
 	    time_t int_ts = (int)pdin.maxever_time;
 	    struct tm* btime = localtime(&int_ts);
 	    strftime(maxever_time_string, 64, " (at %H:%M:%S", btime);
-	    unsigned int part_second = 10000 * (pdin.maxever_time - (int)pdin.maxever_time);
+	    unsigned int part_second = (unsigned int)(10000 * (pdin.maxever_time - (int)pdin.maxever_time));
 	    if(part_second >= 10000)
 		    part_second = 9999;
 	    snprintf(maxever_time_string + strlen(maxever_time_string), 32, ".%04d", part_second);
