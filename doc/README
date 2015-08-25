@@ -5,6 +5,10 @@ module jitter measurement
 config:
     buffer_size: 1000
     cps: 3000000000
+    tty_control_signals:
+        port: /dev/ttyS0
+        pulse_on_trigger: rts
+        pulse_on_new_max_ever: dtr
 trigger:
 -   mod_name: other_module
     clk_id: 1

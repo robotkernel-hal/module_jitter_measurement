@@ -70,6 +70,7 @@ jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node)
     threaded        = get_as<bool>(node, "threaded", true);
     pdout.max_ever_clamp = 0; // disable clamp
     memset(&pdin, 0, sizeof(pdin));
+    tty_port = NULL;
 
     new_maxever_command = 
         get_as<string>(node, "new_maxever_command", string(""));
@@ -89,7 +90,19 @@ jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node)
 
     is_printing = false;
     maxever_time_string[0] = 0;
-	    
+
+    pulse_on_trigger = NO_PULSE;
+    pulse_on_new_max_ever = NO_PULSE;
+    const YAML::Node* tty_node = node.FindValue("tty_control_signals");
+    if(tty_node) {
+	    string port = get_as<string>(*tty_node, "port", "/dev/ttyS0");
+	    tty_port = new tty_control_signals(port.c_str());
+	    string on_trigger = get_as<string>(*tty_node, "pulse_on_trigger", "");
+	    set_pulse_from_string(&pulse_on_trigger, on_trigger);
+	    string on_new_me = get_as<string>(*tty_node, "pulse_on_new_max_ever", "");
+	    set_pulse_from_string(&pulse_on_new_max_ever, on_new_me);
+    }
+    
     calibrate();
 }
 
@@ -103,9 +116,41 @@ jitter_measurement::~jitter_measurement() {
     if (log_diff)
         delete[] log_diff;
 
+    if(tty_port)
+	    delete tty_port;
+    
     // destroy ipc structures
     pthread_mutex_destroy(&sync_lock);
     pthread_cond_destroy(&sync_cond);
+}
+
+void jitter_measurement::set_pulse_from_string(pulse_signals_t* which, std::string which_str) {
+	if(which_str == "rts")
+		*which = PULSE_RTS;
+	else if(which_str == "rts_neg")
+		*which = PULSE_RTS_NEG;
+	else if(which_str == "dtr")
+		*which = PULSE_DTR;
+	else if(which_str == "dtr_neg")
+		*which = PULSE_DTR_NEG;
+}
+void jitter_measurement::do_pulse(pulse_signals_t which) {
+	switch(which) {
+	case PULSE_RTS:
+		tty_port->pulse_rts();
+		break;
+	case PULSE_RTS_NEG:
+		tty_port->pulse_rts_neg();
+		break;
+	case PULSE_DTR:
+		tty_port->pulse_dtr();
+		break;
+	case PULSE_DTR_NEG:
+		tty_port->pulse_dtr_neg();
+		break;
+	case NO_PULSE:
+		break;
+	}
 }
 
 //! register services
@@ -190,6 +235,7 @@ inline uint64_t get_timestamp() {
 }
 
 void jitter_measurement::trigger() {
+	do_pulse(pulse_on_trigger);
 	pdin.last_ts = get_timestamp();
 	
 	buffer[buffer_act][buffer_pos++] = pdin.last_ts;
@@ -266,7 +312,9 @@ void jitter_measurement::print() {
     pdin.last_max = maxjit;
 
     if(new_maxever_time) {
+	    do_pulse(pulse_on_new_max_ever);
 	    double seconds_ago = (get_timestamp() - new_maxever_time) / (double)cps;
+	    log(module_info, "new max ever is %.3fms ago\n", seconds_ago);
 	    pdin.maxever_time = get_seconds() - seconds_ago;
 	    time_t int_ts = (int)pdin.maxever_time;
 	    struct tm* btime = localtime(&int_ts);

@@ -35,6 +35,8 @@
 
 #include "yaml-cpp/yaml.h"
 
+#include "tty_control_signals.h"
+
 namespace module_jitter_measurement {
 
 class jitter_measurement :
@@ -72,7 +74,19 @@ class jitter_measurement :
         char maxever_time_string[64];
         std::string new_maxever_command;
         unsigned int new_maxever_command_threshold;
-
+	tty_control_signals* tty_port;
+	enum pulse_signals_t {
+		NO_PULSE,
+		PULSE_RTS,
+		PULSE_DTR,
+		PULSE_RTS_NEG,
+		PULSE_DTR_NEG
+	};
+	pulse_signals_t pulse_on_trigger;
+	pulse_signals_t pulse_on_new_max_ever;
+	void set_pulse_from_string(pulse_signals_t* which, std::string which_str);
+	void do_pulse(pulse_signals_t which);
+		
         struct jitter_pdin {
             uint64_t maxever;         //! max ever seen jitter
             uint64_t last_max;
