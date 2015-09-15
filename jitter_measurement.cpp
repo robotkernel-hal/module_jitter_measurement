@@ -91,20 +91,20 @@ jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node)
 
     pulse_on_trigger = NO_PULSE;
     pulse_on_new_max_ever = NO_PULSE;
-    const YAML::Node* tty_node = node.FindValue("tty_control_signals");
 #ifdef HAVE_TERMIOS_H	    
-    if(tty_node) {
-	    string port = get_as<string>(*tty_node, "port", "/dev/ttyS0");
+    if (node["tty_control_signals"]) {
+        const YAML::Node& tty_node = node["tty_control_signals"];
+	    string port = get_as<string>(tty_node, "port", "/dev/ttyS0");
 	    tty_port = new tty_control_signals(port.c_str());
-	    string on_trigger = get_as<string>(*tty_node, "pulse_on_trigger", "");
+	    string on_trigger = get_as<string>(tty_node, "pulse_on_trigger", "");
 	    set_pulse_from_string(&pulse_on_trigger, on_trigger);
-	    string on_new_me = get_as<string>(*tty_node, "pulse_on_new_max_ever", "");
+	    string on_new_me = get_as<string>(tty_node, "pulse_on_new_max_ever", "");
 	    set_pulse_from_string(&pulse_on_new_max_ever, on_new_me);
     } else
 	    tty_port = NULL;
 #else
     if(tty_node) 
-	    log(module_error, "tty_control_signals not supported on this architecture!\n");
+	    log(error, "tty_control_signals not supported on this architecture!\n");
 #endif
     
     calibrate();
@@ -174,10 +174,20 @@ void jitter_measurement::register_services() {
 void jitter_measurement::register_pd() {
     if(pd_interface_id)
         return;
-    pd_interface_id = kernel::register_interface_cb(
-            name.c_str(), 
-            "libinterface_process_data_inspection.so", 
-            "last_jitter", 0);
+
+    try {
+        YAML::Node node;
+        node["mod_name"] = name;
+        node["dev_name"] = "last_jitter";
+        node["slave_id"] = 0;
+        node["loglevel"] = (string)ll;
+
+        pd_interface_id = kernel::register_interface_cb(
+                "libinterface_process_data_inspection.so", node);
+    } catch (const exception& e) {
+        log(warning, "creating process data inspecion failed: %s\n", e.what());
+        pd_interface_id = NULL;
+    }
 }
     
 void jitter_measurement::unregister_pd() {
@@ -201,7 +211,7 @@ void jitter_measurement::calibrate() {
     buffer_pos  = 0;
     memset(&pdin, 0, sizeof(pdin));
 #if !defined(NO_RDTSC)
-    log(module_info, "calibrating clocks/sec...\n");
+    log(info, "calibrating clocks/sec...\n");
 
 #ifdef __VXWORKS__
     taskDelay(1);
@@ -214,7 +224,7 @@ void jitter_measurement::calibrate() {
     nanosleep(&ts, NULL);
     cps = (__rdtsc() - begin) * 98.3; // magic factor to correct cps
 #endif
-    log(module_info, "got %llu clock/sec\n", cps);
+    log(info, "got %llu clock/sec\n", cps);
 #else
     cps = 1e9;
 #endif
@@ -321,7 +331,7 @@ void jitter_measurement::print() {
     if(new_maxever_time) {
 	    do_pulse(pulse_on_new_max_ever);
 	    double seconds_ago = (get_timestamp() - new_maxever_time) / (double)cps;
-	    log(module_info, "new max ever is %.3fms ago\n", seconds_ago);
+	    log(info, "new max ever is %.3fms ago\n", seconds_ago);
 	    pdin.maxever_time = get_seconds() - seconds_ago;
 	    time_t int_ts = (int)pdin.maxever_time;
 	    struct tm* btime = localtime(&int_ts);
@@ -343,14 +353,14 @@ void jitter_measurement::print() {
 		     maxever_time_string,
 		     get_seconds() - pdin.maxever_time);
     
-    log(module_info, "mean period: %4lluus, jitter mean:"
+    log(info, "mean period: %4lluus, jitter mean:"
             " %2lluus, max %4lluus, max ever %4lluus%s\n",
 	   cycle, avgjit, maxjit, pdin.maxever, running_maxever_time_string);
 
     if(new_maxever_time && new_maxever_command.size() && pdin.maxever > new_maxever_command_threshold) {
 	    string cmd = format_string("%s %llu %s",
 				       new_maxever_command.c_str(), pdin.maxever, maxever_time_string + 5);
-	    log(module_info, "execute new_maxever_command: %s\n", cmd.c_str());
+	    log(info, "execute new_maxever_command: %s\n", cmd.c_str());
 	    system(cmd.c_str());
     }
 	   
@@ -394,7 +404,7 @@ int jitter_measurement::on_get_cps(ln::service_request& req,
 }
 
 int jitter_measurement::set_state(module_state_t state) {
-    log(module_info, "state change from %s to %s requested\n", 
+    log(info, "state change from %s to %s requested\n", 
             state_to_string(this->state), state_to_string(state));
 
     switch (state) {
@@ -448,7 +458,7 @@ int jitter_measurement::request(int reqcode, void* ptr) {
             break;
         }
         default:
-            log(module_verbose, "not implemented request %d\n", reqcode);
+            log(verbose, "not implemented request %d\n", reqcode);
             ret = -1;
             break;
     }
