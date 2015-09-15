@@ -103,7 +103,7 @@ jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node)
     } else
 	    tty_port = NULL;
 #else
-    if(tty_node) 
+    if (node["tty_control_signals"]) 
 	    log(error, "tty_control_signals not supported on this architecture!\n");
 #endif
     
