@@ -35,18 +35,6 @@
 
 #include "yaml-cpp/yaml.h"
 
-#undef BUILD_DATE
-#undef BUILD_HOST
-#undef BUILD_USER
-#undef PACKAGE
-#undef PACKAGE_BUGREPORT
-#undef PACKAGE_NAME
-#undef PACKAGE_STRING
-#undef PACKAGE_TARNAME
-#undef PACKAGE_VERSION
-#undef VERSION
-#include "config.h"
-
 #ifdef HAVE_TERMIOS_H
 #include "tty_control_signals.h"
 #endif
@@ -89,20 +77,20 @@ class jitter_measurement :
         std::string new_maxever_command;
         unsigned int new_maxever_command_threshold;
 #ifdef HAVE_TERMIOS_H
-	tty_control_signals* tty_port;
+        tty_control_signals* tty_port;
 #endif
-	enum pulse_signals_t {
-		NO_PULSE,
-		PULSE_RTS,
-		PULSE_DTR,
-		PULSE_RTS_NEG,
-		PULSE_DTR_NEG
-	};
-	pulse_signals_t pulse_on_trigger;
-	pulse_signals_t pulse_on_new_max_ever;
-	void set_pulse_from_string(pulse_signals_t* which, std::string which_str);
-	void do_pulse(pulse_signals_t which);
-		
+        enum pulse_signals_t {
+            NO_PULSE,
+            PULSE_RTS,
+            PULSE_DTR,
+            PULSE_RTS_NEG,
+            PULSE_DTR_NEG
+        };
+        pulse_signals_t pulse_on_trigger;
+        pulse_signals_t pulse_on_new_max_ever;
+        void set_pulse_from_string(pulse_signals_t* which, std::string which_str);
+        void do_pulse(pulse_signals_t which);
+
         struct jitter_pdin {
             uint64_t maxever;         //! max ever seen jitter
             uint64_t last_max;

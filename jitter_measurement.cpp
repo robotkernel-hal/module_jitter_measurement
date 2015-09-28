@@ -35,6 +35,12 @@
 #include <pthread.h>
 #include <math.h>
 
+#ifdef __VXWORKS__
+#include <vxWorks.h>
+#include <sysLib.h>
+#include <taskLib.h>
+#endif
+
 #include "yaml-cpp/yaml.h"
 #include <string_util/string_util.h>
 
@@ -91,20 +97,20 @@ jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node)
 
     pulse_on_trigger = NO_PULSE;
     pulse_on_new_max_ever = NO_PULSE;
-#ifdef HAVE_TERMIOS_H	    
+#ifdef HAVE_TERMIOS_H
     if (node["tty_control_signals"]) {
         const YAML::Node& tty_node = node["tty_control_signals"];
-	    string port = get_as<string>(tty_node, "port", "/dev/ttyS0");
-	    tty_port = new tty_control_signals(port.c_str());
-	    string on_trigger = get_as<string>(tty_node, "pulse_on_trigger", "");
-	    set_pulse_from_string(&pulse_on_trigger, on_trigger);
-	    string on_new_me = get_as<string>(tty_node, "pulse_on_new_max_ever", "");
-	    set_pulse_from_string(&pulse_on_new_max_ever, on_new_me);
+        string port = get_as<string>(tty_node, "port", "/dev/ttyS0");
+        tty_port = new tty_control_signals(port.c_str());
+        string on_trigger = get_as<string>(tty_node, "pulse_on_trigger", "");
+        set_pulse_from_string(&pulse_on_trigger, on_trigger);
+        string on_new_me = get_as<string>(tty_node, "pulse_on_new_max_ever", "");
+        set_pulse_from_string(&pulse_on_new_max_ever, on_new_me);
     } else
-	    tty_port = NULL;
+        tty_port = NULL;
 #else
     if (node["tty_control_signals"]) 
-	    log(error, "tty_control_signals not supported on this architecture!\n");
+        log(error, "tty_control_signals not supported on this architecture!\n");
 #endif
     
     calibrate();
@@ -120,9 +126,9 @@ jitter_measurement::~jitter_measurement() {
     if (log_diff)
         delete[] log_diff;
 
-#ifdef HAVE_TERMIOS_H	    
+#ifdef HAVE_TERMIOS_H
     if(tty_port)
-	    delete tty_port;
+        delete tty_port;
 #endif    
     // destroy ipc structures
     pthread_mutex_destroy(&sync_lock);
@@ -130,33 +136,33 @@ jitter_measurement::~jitter_measurement() {
 }
 
 void jitter_measurement::set_pulse_from_string(pulse_signals_t* which, std::string which_str) {
-	if(which_str == "rts")
-		*which = PULSE_RTS;
-	else if(which_str == "rts_neg")
-		*which = PULSE_RTS_NEG;
-	else if(which_str == "dtr")
-		*which = PULSE_DTR;
-	else if(which_str == "dtr_neg")
-		*which = PULSE_DTR_NEG;
+    if(which_str == "rts")
+        *which = PULSE_RTS;
+    else if(which_str == "rts_neg")
+        *which = PULSE_RTS_NEG;
+    else if(which_str == "dtr")
+        *which = PULSE_DTR;
+    else if(which_str == "dtr_neg")
+        *which = PULSE_DTR_NEG;
 }
 void jitter_measurement::do_pulse(pulse_signals_t which) {
-#ifdef HAVE_TERMIOS_H	    
-	switch(which) {
-	case PULSE_RTS:
-		tty_port->pulse_rts();
-		break;
-	case PULSE_RTS_NEG:
-		tty_port->pulse_rts_neg();
-		break;
-	case PULSE_DTR:
-		tty_port->pulse_dtr();
-		break;
-	case PULSE_DTR_NEG:
-		tty_port->pulse_dtr_neg();
-		break;
-	case NO_PULSE:
-		break;
-	}
+#ifdef HAVE_TERMIOS_H
+    switch(which) {
+        case PULSE_RTS:
+            tty_port->pulse_rts();
+            break;
+        case PULSE_RTS_NEG:
+            tty_port->pulse_rts_neg();
+            break;
+        case PULSE_DTR:
+            tty_port->pulse_dtr();
+            break;
+        case PULSE_DTR_NEG:
+            tty_port->pulse_dtr_neg();
+            break;
+        case NO_PULSE:
+            break;
+    }
 #endif
 }
 
@@ -197,12 +203,6 @@ void jitter_measurement::unregister_pd() {
     pd_interface_id = NULL;
 }
 
-#ifdef __VXWORKS__
-#include <vxWorks.h>
-#include <sysLib.h>
-#include <taskLib.h>
-#endif
-
 //! calibrate function for clocks per second
 void jitter_measurement::calibrate() {
     if (cps != 1)
@@ -236,36 +236,36 @@ void jitter_measurement::calibrate() {
  */
 
 inline double get_seconds() {
-	struct timespec ts;
-	clock_gettime(CLOCK_REALTIME, &ts);
-	return (double)ts.tv_sec + 1e-9 * ts.tv_nsec;
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    return (double)ts.tv_sec + 1e-9 * ts.tv_nsec;
 }
 
 inline uint64_t get_timestamp() {
 #if !defined(NO_RDTSC)
-	return __rdtsc();
+    return __rdtsc();
 #else
-	struct timespec ts;
-	clock_gettime(CLOCK_REALTIME, &ts);
-	return (uint64_t)(ts.tv_sec * 1e9 + ts.tv_nsec);
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    return (uint64_t)(ts.tv_sec * 1e9 + ts.tv_nsec);
 #endif
 }
 
 void jitter_measurement::trigger() {
-	do_pulse(pulse_on_trigger);
-	pdin.last_ts = get_timestamp();
-	
-	buffer[buffer_act][buffer_pos++] = pdin.last_ts;
-	if (buffer_pos >= buffer_size) {
-		buffer_pos = 0;
-		buffer_act = (buffer_act + 1) % 2; 
-		
-		if (threaded)
-			pthread_cond_signal(&sync_cond);
-		else
-			print();
-	}
-	trigger_modules();
+    do_pulse(pulse_on_trigger);
+    pdin.last_ts = get_timestamp();
+
+    buffer[buffer_act][buffer_pos++] = pdin.last_ts;
+    if (buffer_pos >= buffer_size) {
+        buffer_pos = 0;
+        buffer_act = (buffer_act + 1) % 2; 
+
+        if (threaded)
+            pthread_cond_signal(&sync_cond);
+        else
+            print();
+    }
+    trigger_modules();
 }
 
 //! returns last measuremente
@@ -312,12 +312,12 @@ void jitter_measurement::print() {
     for (i = 0; i < buffer_size - 1; i++) {
         dev     = labs(log_diff[i] - cycle); 
         maxjit  = max(dev, maxjit);
-	uint64_t this_maxjit = (uint64_t)(maxjit * fac);
-	if(this_maxjit > pdin.maxever) {
-		// new max ever!
-		pdin.maxever = this_maxjit;
-		new_maxever_time = buffer[act_buf][i];
-	}
+        uint64_t this_maxjit = (uint64_t)(maxjit * fac);
+        if(this_maxjit > pdin.maxever) {
+            // new max ever!
+            pdin.maxever = this_maxjit;
+            new_maxever_time = buffer[act_buf][i];
+        }
         avgjit += (dev * dev);
     }
     avgjit /= (buffer_size - 1);
@@ -329,47 +329,44 @@ void jitter_measurement::print() {
     pdin.last_max = maxjit;
 
     if(new_maxever_time) {
-	    do_pulse(pulse_on_new_max_ever);
-	    double seconds_ago = (get_timestamp() - new_maxever_time) / (double)cps;
-	    log(info, "new max ever is %.3fms ago\n", seconds_ago);
-	    pdin.maxever_time = get_seconds() - seconds_ago;
-	    time_t int_ts = (int)pdin.maxever_time;
-	    struct tm* btime = localtime(&int_ts);
-	    strftime(maxever_time_string, 64, " (at %H:%M:%S", btime);
-	    unsigned int part_second = (unsigned int)(10000 * (pdin.maxever_time - (int)pdin.maxever_time));
-	    if(part_second >= 10000)
-		    part_second = 9999;
-	    snprintf(maxever_time_string + strlen(maxever_time_string), 32, ".%04d", part_second);
+        do_pulse(pulse_on_new_max_ever);
+        double seconds_ago = (get_timestamp() - new_maxever_time) / (double)cps;
+        log(info, "new max ever is %.3fms ago\n", seconds_ago);
+        pdin.maxever_time = get_seconds() - seconds_ago;
+        time_t int_ts = (int)pdin.maxever_time;
+        struct tm* btime = localtime(&int_ts);
+        strftime(maxever_time_string, 64, " (at %H:%M:%S", btime);
+        unsigned int part_second = (unsigned int)(10000 * (pdin.maxever_time - (int)pdin.maxever_time));
+        if(part_second >= 10000)
+            part_second = 9999;
+        snprintf(maxever_time_string + strlen(maxever_time_string), 32, ".%04d", part_second);
     }
-	    
+
     if(pdout.max_ever_clamp != 0 && pdin.maxever > pdout.max_ever_clamp)
         pdin.maxever = pdout.max_ever_clamp;
 
     char running_maxever_time_string[128];
     if(maxever_time_string[0] == 0)
-	    running_maxever_time_string[0] = 0;
+        running_maxever_time_string[0] = 0;
     else
-	    snprintf(running_maxever_time_string, 128, "%s, %.1fs ago)",
-		     maxever_time_string,
-		     get_seconds() - pdin.maxever_time);
-    
+        snprintf(running_maxever_time_string, 128, "%s, %.1fs ago)",
+                maxever_time_string,
+                get_seconds() - pdin.maxever_time);
+
     log(info, "mean period: %4lluus, jitter mean:"
             " %2lluus, max %4lluus, max ever %4lluus%s\n",
-	   cycle, avgjit, maxjit, pdin.maxever, running_maxever_time_string);
+            cycle, avgjit, maxjit, pdin.maxever, running_maxever_time_string);
 
     if(new_maxever_time && new_maxever_command.size() && pdin.maxever > new_maxever_command_threshold) {
-	    string cmd = format_string("%s %llu %s",
-				       new_maxever_command.c_str(), pdin.maxever, maxever_time_string + 5);
-	    log(info, "execute new_maxever_command: %s\n", cmd.c_str());
-	    system(cmd.c_str());
+        string cmd = format_string("%s %llu %s",
+                new_maxever_command.c_str(), pdin.maxever, maxever_time_string + 5);
+        log(info, "execute new_maxever_command: %s\n", cmd.c_str());
+        system(cmd.c_str());
     }
-	   
 }
 
 //! handler function called if thread is running
 void jitter_measurement::run() {
-	// calibrate();
-
     pthread_mutex_lock(&sync_lock);
 
     while (running()) {
