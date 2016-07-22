@@ -1,4 +1,4 @@
-ACLOCAL_AMFLAGS = -I m4 
+ACLOCAL_AMFLAGS = -I m4 -I scripts/m4
 
 libdir = $(prefix)/lib
 lib_LTLIBRARIES = libmodule_jitter_measurement.la
@@ -9,7 +9,7 @@ libmodule_jitter_measurement_la_SOURCES  = jitter_measurement.cpp
 libmodule_jitter_measurement_la_CXXFLAGS = -Wall -I$(top_srcdir)/src -I$(top_builddir) @ROBOTKERNEL_CFLAGS@ @ARCH_CFLAGS@
 libmodule_jitter_measurement_la_LDFLAGS  = -Wall -release $(PACKAGE_VERSION)
 
-VPATH = $(srcdir):$(srcdir)/message_definitions 
+VPATH = $(srcdir):$(srcdir)/share/ln/message_definitions 
 
 LN_MESSAGES = robotkernel/jitter_measurement/jitter \
 			  robotkernel/jitter_measurement/reset_max_ever \
