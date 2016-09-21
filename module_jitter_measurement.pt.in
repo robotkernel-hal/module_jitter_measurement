@@ -3,12 +3,11 @@ NAME                = @PACKAGE@
 VERSION             = @PACKAGE_VERSION@
 DESCRIPTION         = robotkernel @PACKAGE@
 DOCUMENTATION       = https://rmintra01.robotic.dlr.de/wiki/Robotkernel/module_jitter_measurement
-MAINTAINER          = Robert Burger <robert.burger@dlr.de>
+MAINTAINER          = @MAINTAINER@
 ARCHS               = @ARCHS@
 
 [install]
 build/${ARCH}/install/lib => lib/${ARCH}
 doc/ => doc/
-message_definitions/ => share/message_definitions
 share/ => share/
 
