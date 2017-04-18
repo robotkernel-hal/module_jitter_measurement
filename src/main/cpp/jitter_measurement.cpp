@@ -47,16 +47,32 @@
 MODULE_DEF(module_jitter_measurement, module_jitter_measurement::jitter_measurement)
 
 using namespace std;
+using namespace std::placeholders;
 using namespace robotkernel;
 using namespace module_jitter_measurement;
+using namespace string_util;
+        
+static const std::string pd_definition_pdin = 
+"uint64_t maxever\n"
+"uint64_t last_max\n"
+"uint64_t last_cycle\n"
+"uint64_t last_ts\n"
+"double maxever_time\n";
 
-#if !defined(NO_RDTSC)
-uint64_t __rdtsc(void) {
-    unsigned a, d;
-    __asm__ volatile("rdtsc" : "=a" (a), "=d" (d));
-    return ((uint64_t)a) | (((uint64_t)d) << 32);
-}
-#endif
+static const std::string pd_definition_pdout = 
+"uint64_t maxever\n"
+"uint64_t last_max\n"
+"uint64_t last_cycle\n"
+"uint64_t last_ts\n"
+"double maxever_time\n";
+
+//#if !defined(NO_RDTSC)
+//uint64_t __rdtsc(void) {
+//    unsigned a, d;
+//    __asm__ volatile("rdtsc" : "=a" (a), "=d" (d));
+//    return ((uint64_t)a) | (((uint64_t)d) << 32);
+//}
+//#endif
 
 //! yaml config construction
 /*!
@@ -64,7 +80,8 @@ uint64_t __rdtsc(void) {
  * \param node yaml node
  */
 jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node) 
-: runnable(0, 0), module_base("module_jitter_measurement", name, node) {
+: runnable(0, 0), module_base("module_jitter_measurement", name, node), 
+  service_provider::process_data_inspection::base(name, "jitter") {
     buffer_size     = get_as<unsigned int>(node, "buffer_size");
     buffer[0]       = new uint64_t[buffer_size];
     buffer[1]       = new uint64_t[buffer_size];
@@ -72,7 +89,6 @@ jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node)
     buffer_pos      = 0;
     buffer_act      = 0;
     cps             = get_as<uint64_t>(node, "cps", 1);
-    pd_interface_id = NULL;
     threaded        = get_as<bool>(node, "threaded", true);
     pdout.max_ever_clamp = 0; // disable clamp
     memset(&pdin, 0, sizeof(pdin));
@@ -168,39 +184,27 @@ void jitter_measurement::do_pulse(pulse_signals_t which) {
 
 //! register services
 void jitter_measurement::register_services() { 
+    stringstream base;
+    base << name << "."; 
+
     // register services
     kernel& k = *kernel::get_instance();
-    if (k.clnt) {
-        string base = k.clnt->name + "." + this->name + ".";
-        register_reset_max_ever(k.clnt, base + "reset_max_ever");
-        register_get_cps(k.clnt, base + "get_cps");
-    }
+    k.add_service(name, base.str() + "reset_max_ever",
+            service_definition_reset_max_ever,
+            std::bind(&jitter_measurement::service_reset_max_ever, this, _1, _2));
+    k.add_service(name, base.str() + "get_cps",
+            service_definition_get_cps,
+            std::bind(&jitter_measurement::service_get_cps, this, _1, _2));
 }
 
 void jitter_measurement::register_pd() {
-    if(pd_interface_id)
-        return;
-
-    try {
-        YAML::Node node;
-        node["mod_name"] = name;
-        node["dev_name"] = "last_jitter";
-        node["slave_id"] = 0;
-        node["loglevel"] = (string)ll;
-
-        pd_interface_id = kernel::register_interface_cb(
-                "libinterface_process_data_inspection.so", node);
-    } catch (const exception& e) {
-        log(warning, "creating process data inspecion failed: %s\n", e.what());
-        pd_interface_id = NULL;
-    }
+    kernel& k = *kernel::get_instance();
+	k.add_service_requester(std::shared_ptr<jitter_measurement>(this));
 }
     
 void jitter_measurement::unregister_pd() {
-    if(!pd_interface_id)
-        return;
-    kernel::unregister_interface_cb(pd_interface_id);
-    pd_interface_id = NULL;
+    kernel& k = *kernel::get_instance();
+	k.remove_service_requester(std::shared_ptr<jitter_measurement>(this));
 }
 
 //! calibrate function for clocks per second
@@ -220,7 +224,7 @@ void jitter_measurement::calibrate() {
     cps = (uint64_t)((__rdtsc() - begin - 1.2E5) * sysClkRateGet());
 #else
     uint64_t begin = __rdtsc();
-    struct timespec ts = { 0, 1E7 };
+    struct timespec ts = { 0, 1000000 };
     nanosleep(&ts, NULL);
     cps = (__rdtsc() - begin) * 98.3; // magic factor to correct cps
 #endif
@@ -382,23 +386,46 @@ void jitter_measurement::run() {
     pthread_mutex_unlock(&sync_lock);
 }
 
-//! service callbacks
-int jitter_measurement::on_reset_max_ever(ln::service_request& req, 
-        ln_service_robotkernel_jitter_measurement_reset_max_ever& svc) {
-    svc.resp.maxever = pdin.maxever;
+//! reset max ever
+/*!
+ * \param request service request data
+ * \param response service response data
+ * \return success
+ */
+int jitter_measurement::service_reset_max_ever(
+        const robotkernel::service_arglist_t& request,
+        robotkernel::service_arglist_t& response) {
+#define RESET_MAX_EVER_RESP_MAXEVER 0
+    response[RESET_MAX_EVER_RESP_MAXEVER] = pdin.maxever;
     pdin.maxever = 0;
     pdin.maxever_time = 0;
     maxever_time_string[0] = 0;
-    req.respond();
+
     return 0;
 }
 
-int jitter_measurement::on_get_cps(ln::service_request& req, 
-        ln_service_robotkernel_jitter_measurement_get_cps& svc) {
-    svc.resp.cps = cps;
-    req.respond();
+const std::string jitter_measurement::service_definition_reset_max_ever = 
+    "response:\n"
+    "   uint32_t: maxever\n";
+
+//! reset max ever
+/*!
+ * \param request service request data
+ * \param response service response data
+ * \return success
+ */
+int jitter_measurement::service_get_cps(
+        const robotkernel::service_arglist_t& request,
+        robotkernel::service_arglist_t& response) {
+#define GET_CPS_RESP_CPS 0
+    response[GET_CPS_RESP_CPS] = cps;
+
     return 0;
 }
+
+const std::string jitter_measurement::service_definition_get_cps =
+    "response:\n"
+    "   uint32_t: cps\n";
 
 int jitter_measurement::set_state(module_state_t state) {
     log(info, "state change from %s to %s requested\n", 
@@ -433,33 +460,39 @@ int jitter_measurement::set_state(module_state_t state) {
     return 0;
 }
         
+//! handle requests to jitter measurement module
+/*!
+ * \param reqcode request code
+ * \param ptr pointer to request argument
+ * \return 0 on success, -1 on error
+ */
 int jitter_measurement::request(int reqcode, void* ptr) {
-    int ret = 0;
     if (trigger_base::request(reqcode, ptr) == 0)
         return 0;
 
-    switch (reqcode) {
-        case MOD_REQUEST_REGISTER_SERVICES:
-            register_services();
-            break;
-        case MOD_REQUEST_GET_PDIN: {
-            process_data_t *pdg = (process_data_t *)ptr;
-            pdg->pd = &pdin;
-            pdg->len = sizeof(pdin);
-            break;
-        }
-        case MOD_REQUEST_GET_PDOUT: {
-            process_data_t *pdg = (process_data_t *)ptr;
-            pdg->pd = &pdout;
-            pdg->len = sizeof(pdout);
-            break;
-        }
-        default:
-            log(verbose, "not implemented request %d\n", reqcode);
-            ret = -1;
-            break;
-    }
+    log(verbose, "not implemented request %d\n", reqcode);
+    return -1;
+}
 
-    return ret;
+//! return input process data (measurements)
+/*!
+ * \param pd return input process data
+ */
+void jitter_measurement::get_pdin(
+        service_provider::process_data_inspection::pd_t& pd) {
+
+    pd.resize(sizeof(pdin));
+    memcpy(&pd[0], &pdin, sizeof(pdin));
+}
+
+//! return output process data (commands)
+/*!
+ * \param pd return output process data
+ */
+void jitter_measurement::get_pdout(
+        service_provider::process_data_inspection::pd_t& pd) {
+
+    pd.resize(sizeof(pdout));
+    memcpy(&pd[0], &pdout, sizeof(pdout));
 }
 

@@ -25,13 +25,11 @@
 #ifndef __MODULE_JITTER_MEASSUREMENT_H__
 #define __MODULE_JITTER_MEASSUREMENT_H__
 
-#define LN_UNREGISTER_SERVICE_IN_BASE_DETOR  
-#include "ln_messages.h"
-#undef LN_UNREGISTER_SERVICE_IN_BASE_DETOR
-
 #include "robotkernel/runnable.h"
 #include "robotkernel/trigger_base.h"
 #include "robotkernel/module_base.h"
+
+#include "service_provider/process_data_inspection/base.h"
 
 #include "yaml-cpp/yaml.h"
 
@@ -45,8 +43,7 @@ class jitter_measurement :
     public robotkernel::runnable,
     public robotkernel::trigger_base,
     public robotkernel::module_base,
-    public ln_service_reset_max_ever_base,
-    public ln_service_get_cps_base {
+    public service_provider::process_data_inspection::base {
 
     private: 
         //! position in buffer
@@ -70,7 +67,6 @@ class jitter_measurement :
 
     public:
         size_t buffer_size;       //! size of jitter measurement buffer
-        robotkernel::kernel::interface_id_t pd_interface_id;
         bool threaded;
         bool is_printing;
         char maxever_time_string[64];
@@ -120,13 +116,12 @@ class jitter_measurement :
          */
         int set_state(module_state_t state);
 
-        //! send a request to module
-        /*! 
-          \param hdl module handle
-          \param reqcode request code
-          \param ptr pointer to request structure
-          \return success or failure
-          */
+        //! handle requests to jitter measurement module
+        /*!
+         * \param reqcode request code
+         * \param ptr pointer to request argument
+         * \return 0 on success, -1 on error
+         */
         int request(int reqcode, void* ptr);
 
         //! register services
@@ -147,11 +142,37 @@ class jitter_measurement :
         //! returns last measuremente
         double last_measurement();
 
-        //! service callbacks
-        int on_reset_max_ever(ln::service_request& req, 
-                ln_service_robotkernel_jitter_measurement_reset_max_ever& svc);
-        int on_get_cps(ln::service_request& req, 
-                ln_service_robotkernel_jitter_measurement_get_cps& svc);
+        //! reset max ever
+        /*!
+         * \param request service request data
+         * \param response service response data
+         * \return success
+         */
+        int service_reset_max_ever(const robotkernel::service_arglist_t& request,
+                robotkernel::service_arglist_t& response);
+        static const std::string service_definition_reset_max_ever;
+
+        //! reset max ever
+        /*!
+         * \param request service request data
+         * \param response service response data
+         * \return success
+         */
+        int service_get_cps(const robotkernel::service_arglist_t& request,
+                robotkernel::service_arglist_t& response);
+        static const std::string service_definition_get_cps;
+
+        //! return input process data (measurements)
+        /*!
+         * \param pd return input process data
+         */
+        void get_pdin(service_provider::process_data_inspection::pd_t& pd);
+
+        //! return output process data (commands)
+        /*!
+         * \param pd return output process data
+         */
+        void get_pdout(service_provider::process_data_inspection::pd_t& pd);
 };
 
 };

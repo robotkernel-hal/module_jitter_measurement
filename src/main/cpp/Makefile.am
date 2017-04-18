@@ -2,25 +2,10 @@ ACLOCAL_AMFLAGS = -I m4 -I scripts/m4
 
 libdir = $(prefix)/lib
 lib_LTLIBRARIES = libmodule_jitter_measurement.la
-BUILT_SOURCES = ln_messages.h
-CLEANFILES = ln_messages.h
 
 libmodule_jitter_measurement_la_SOURCES  = jitter_measurement.cpp
-libmodule_jitter_measurement_la_CXXFLAGS = -Wall -I$(srcdir) -I$(builddir) @ARCH_CFLAGS@ \
-                                           @YAML_CPP_CFLAGS@ @ROBOTKERNEL_CFLAGS@ @LIBSTRING_UTIL_CFLAGS@
+libmodule_jitter_measurement_la_CXXFLAGS = -std=c++11 -Wall -I$(srcdir) -I$(builddir) @ARCH_CFLAGS@ \
+                                           @YAML_CPP_RMC_CFLAGS@ @ROBOTKERNEL_CFLAGS@ \
+										   @SERVICE_PROVIDER_PROCESS_DATA_INSPECTION_CFLAGS@ @LIBSTRING_UTIL_CFLAGS@
 libmodule_jitter_measurement_la_LDFLAGS  = -Wall -release $(PACKAGE_VERSION)
 
-VPATH = $(srcdir):$(top_srcdir)/share/ln/message_definitions 
-
-LN_MESSAGES = robotkernel/jitter_measurement/jitter \
-              robotkernel/jitter_measurement/reset_max_ever \
-              robotkernel/jitter_measurement/get_cps
-
-ln_messages.h: Makefile $(LN_MESSAGES)
-	@echo creating ln_messages.h
-	@LN_GENERATE@ -o $@ $(LN_MESSAGES)
-	touch $@
-
-install-exec-hook:
-	mkdir -p $(prefix)/share/ln
-	-cp -rf $(top_srcdir)/share/ln/* $(prefix)/share/ln/
