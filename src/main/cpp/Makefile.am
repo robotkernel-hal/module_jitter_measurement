@@ -1,6 +1,5 @@
 ACLOCAL_AMFLAGS = -I m4 
 
-libdir = $(prefix)/lib
 lib_LTLIBRARIES = libmodule_jitter_measurement.la
 
 libmodule_jitter_measurement_la_SOURCES  = jitter_measurement.cpp
