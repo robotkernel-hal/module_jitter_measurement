@@ -38,10 +38,13 @@
 #endif
 
 namespace module_jitter_measurement {
+#ifdef EMACS
+}
+#endif
 
 class jitter_measurement :
     public robotkernel::runnable,
-    public robotkernel::trigger_base,
+    //public robotkernel::trigger_base,
     public robotkernel::module_base,
     public service_provider::process_data_inspection::base {
 
@@ -116,14 +119,6 @@ class jitter_measurement :
          */
         int set_state(module_state_t state);
 
-        //! handle requests to jitter measurement module
-        /*!
-         * \param reqcode request code
-         * \param ptr pointer to request argument
-         * \return 0 on success, -1 on error
-         */
-        int request(int reqcode, void* ptr);
-
         //! register services
         void register_services();
         void register_pd();
@@ -175,6 +170,9 @@ class jitter_measurement :
         void get_pdout(service_provider::process_data_inspection::pd_t& pd);
 };
 
+#ifdef EMACS
+{
+#endif
 };
 
 #endif // __MODULE_JITTER_MEASSUREMENT_H__

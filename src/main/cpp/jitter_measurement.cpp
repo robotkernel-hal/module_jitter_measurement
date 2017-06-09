@@ -224,7 +224,7 @@ void jitter_measurement::calibrate() {
     cps = (uint64_t)((__rdtsc() - begin - 1.2E5) * sysClkRateGet());
 #else
     uint64_t begin = __rdtsc();
-    struct timespec ts = { 0, 1000000 };
+    struct timespec ts = { 0, 10000000 };
     nanosleep(&ts, NULL);
     cps = (__rdtsc() - begin) * 98.3; // magic factor to correct cps
 #endif
@@ -269,7 +269,7 @@ void jitter_measurement::trigger() {
         else
             print();
     }
-    trigger_modules();
+    //trigger_modules();
 }
 
 //! returns last measuremente
@@ -428,52 +428,73 @@ const std::string jitter_measurement::service_definition_get_cps =
     "   uint32_t: cps\n";
 
 int jitter_measurement::set_state(module_state_t state) {
-    log(info, "state change from %s to %s requested\n", 
-            state_to_string(this->state), state_to_string(state));
+    // get transition
+    uint32_t transition = GEN_STATE(this->state, state);
+    
+    log(info, "state %s requested\n", state_to_string(state));
 
-    switch (state) {
-        case module_state_init:
+    switch (transition) {
+        case op_2_safeop:
+        case op_2_preop:
+        case op_2_init:
+        case op_2_boot:
+            // ====> stop sending commands
+            if (state == module_state_safeop)
+                break;
+        case safeop_2_preop:
+        case safeop_2_init:
+        case safeop_2_boot:
+            // ====> stop receiving measurements
             stop();
-            unregister_pd();
+
+            if (state == module_state_preop)
+                break;
+        case preop_2_init:
+        case preop_2_boot:
+            // ====> deinit devices
+        case init_2_init:
+            // ====> re-/open device
+            if (state == module_state_init)
+                break;
+        case init_2_boot:
             break;
-        case module_state_preop:
-            register_pd();
+        case boot_2_init:
+        case boot_2_preop:
+        case boot_2_safeop:
+        case boot_2_op:
+            // ====> re-/open device
+            if (state == module_state_init)
+                break;
+        case init_2_op:
+        case init_2_safeop:
+        case init_2_preop:
+            // ====> initial devices            
+            if (state == module_state_preop)
+                break;
+        case preop_2_op:
+        case preop_2_safeop:
+            // ====> start receiving measurements
             if (threaded)
                 start();
-            break;
-        case module_state_safeop:
-            break;
-        case module_state_op:
 
-            if (this->state < module_state_safeop)
-                // invalid state transition
-                return -1;
+            if (state == module_state_safeop)
+                break;
+        case safeop_2_op:
+            // ====> start sending commands           
             break;
+        case op_2_op:
+        case safeop_2_safeop:
+        case preop_2_preop:
+            // ====> do nothing
+            break;
+
         default:
-            // invalid state
-            return -1;
+            break;
     }
 
-    // set actual state
-    this->state = state;
-
-    return 0;
+    return (this->state = state);
 }
         
-//! handle requests to jitter measurement module
-/*!
- * \param reqcode request code
- * \param ptr pointer to request argument
- * \return 0 on success, -1 on error
- */
-int jitter_measurement::request(int reqcode, void* ptr) {
-    if (trigger_base::request(reqcode, ptr) == 0)
-        return 0;
-
-    log(verbose, "not implemented request %d\n", reqcode);
-    return -1;
-}
-
 //! return input process data (measurements)
 /*!
  * \param pd return input process data
