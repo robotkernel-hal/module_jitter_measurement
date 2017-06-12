@@ -241,10 +241,19 @@ void jitter_measurement::calibrate() {
     taskDelay(1);
     cps = (uint64_t)((__rdtsc() - begin - 1.2E5) * sysClkRateGet());
 #else
+    struct timespec ts_time;
+    clock_gettime(CLOCK_REALTIME, &ts_time);
+    double begin_time = (double)ts_time.tv_sec + (ts_time.tv_nsec / 1E9);
     uint64_t begin = __rdtsc();
+
     struct timespec ts = { 0, 10000000 };
     nanosleep(&ts, NULL);
-    cps = (__rdtsc() - begin) * 98.3; // magic factor to correct cps
+    
+    clock_gettime(CLOCK_REALTIME, &ts_time);
+    double end_time = (double)ts_time.tv_sec + (ts_time.tv_nsec / 1E9);
+    uint64_t end = __rdtsc();
+    log(info, "got %17.13f sec diff\n", (end_time - begin_time));
+    cps = (end - begin) / (end_time - begin_time); // magic factor to correct cps
 #endif
     log(info, "got %llu clock/sec\n", cps);
 #else
