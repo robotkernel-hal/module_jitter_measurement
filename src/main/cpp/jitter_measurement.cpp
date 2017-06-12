@@ -90,8 +90,7 @@ jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node)
     buffer_act      = 0;
     cps             = get_as<uint64_t>(node, "cps", 1);
     threaded        = get_as<bool>(node, "threaded", true);
-    pdout.max_ever_clamp = 0; // disable clamp
-    memset(&pdin, 0, sizeof(pdin));
+
     new_maxever_command = 
         get_as<string>(node, "new_maxever_command", string(""));
     new_maxever_command_threshold = 
@@ -100,6 +99,24 @@ jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node)
     memset(buffer[0], 0, sizeof(uint64_t) * buffer_size);
     memset(buffer[1], 0, sizeof(uint64_t) * buffer_size);
     memset(log_diff, 0, sizeof(uint64_t) * buffer_size);
+
+    // create named process data for inputs
+    string pdin_desc = 
+        "uint64_t: max_ever\n"
+        "uint64_t: last_max\n"
+        "uint64_t: last_cycle\n"
+        "uint64_t: last_ts\n"
+        "double: max_ever_time\n";
+
+    pdin = make_shared<robotkernel::process_data>(
+            sizeof(struct jitter_pdin), name, string("pd.in"), pdin_desc);
+            
+    // create named process data for outputs 
+    string pdout_desc = 
+        "uint64_t: max_ever_clamp\n";
+
+    pdout = make_shared<robotkernel::process_data>(
+            sizeof(struct jitter_pdout), name, string("pd.out"), pdout_desc);
 
     // create ipc structures
     pthread_mutex_init(&sync_lock, NULL);
@@ -213,7 +230,8 @@ void jitter_measurement::calibrate() {
         return;
 
     buffer_pos  = 0;
-    memset(&pdin, 0, sizeof(pdin));
+    auto& buf = pdin->get_write_buffer();
+    memset(&buf[0], 0, buf.size());
 #if !defined(NO_RDTSC)
     log(info, "calibrating clocks/sec...\n");
 
@@ -257,9 +275,12 @@ inline uint64_t get_timestamp() {
 
 void jitter_measurement::trigger() {
     do_pulse(pulse_on_trigger);
-    pdin.last_ts = get_timestamp();
 
-    buffer[buffer_act][buffer_pos++] = pdin.last_ts;
+    auto& buf = pdin->get_write_buffer();
+    struct jitter_pdin *pdin = (struct jitter_pdin *)&buf[0];
+    pdin->last_ts = get_timestamp();
+
+    buffer[buffer_act][buffer_pos++] = pdin->last_ts;
     if (buffer_pos >= buffer_size) {
         buffer_pos = 0;
         buffer_act = (buffer_act + 1) % 2; 
@@ -303,6 +324,13 @@ void jitter_measurement::print() {
     uint64_t dev;
     uint64_t cycle = 0, avgjit = 0, maxjit = 0;
 
+    auto& buf = pdin->get_write_buffer();
+    struct jitter_pdin *pdin = (struct jitter_pdin *)&buf[0];
+    
+    auto& bufout = pdout->get_read_buffer();
+    struct jitter_pdout *pdout = (struct jitter_pdout *)&bufout[0];
+
+
     // calculate differences and sum of differences
     for (i = 0; i < buffer_size - 1; ++i) {
         log_diff[i]  = buffer[act_buf][i+1] - buffer[act_buf][i];
@@ -317,9 +345,9 @@ void jitter_measurement::print() {
         dev     = labs(log_diff[i] - cycle); 
         maxjit  = max(dev, maxjit);
         uint64_t this_maxjit = (uint64_t)(maxjit * fac);
-        if(this_maxjit > pdin.maxever) {
+        if(this_maxjit > pdin->maxever) {
             // new max ever!
-            pdin.maxever = this_maxjit;
+            pdin->maxever = this_maxjit;
             new_maxever_time = buffer[act_buf][i];
         }
         avgjit += (dev * dev);
@@ -329,25 +357,25 @@ void jitter_measurement::print() {
     avgjit = (uint64_t)(sqrt((double)avgjit) * fac);
     cycle  = (uint64_t)(cycle  * fac);
     maxjit = (uint64_t)(maxjit * fac);
-    pdin.last_cycle = cycle;
-    pdin.last_max = maxjit;
+    pdin->last_cycle = cycle;
+    pdin->last_max = maxjit;
 
     if(new_maxever_time) {
         do_pulse(pulse_on_new_max_ever);
         double seconds_ago = (get_timestamp() - new_maxever_time) / (double)cps;
         log(info, "new max ever is %.3fms ago\n", seconds_ago);
-        pdin.maxever_time = get_seconds() - seconds_ago;
-        time_t int_ts = (int)pdin.maxever_time;
+        pdin->maxever_time = get_seconds() - seconds_ago;
+        time_t int_ts = (int)pdin->maxever_time;
         struct tm* btime = localtime(&int_ts);
         strftime(maxever_time_string, 64, " (at %H:%M:%S", btime);
-        unsigned int part_second = (unsigned int)(10000 * (pdin.maxever_time - (int)pdin.maxever_time));
+        unsigned int part_second = (unsigned int)(10000 * (pdin->maxever_time - (int)pdin->maxever_time));
         if(part_second >= 10000)
             part_second = 9999;
         snprintf(maxever_time_string + strlen(maxever_time_string), 32, ".%04d", part_second);
     }
 
-    if(pdout.max_ever_clamp != 0 && pdin.maxever > pdout.max_ever_clamp)
-        pdin.maxever = pdout.max_ever_clamp;
+    if(pdout->max_ever_clamp != 0 && pdin->maxever > pdout->max_ever_clamp)
+        pdin->maxever = pdout->max_ever_clamp;
 
     char running_maxever_time_string[128];
     if(maxever_time_string[0] == 0)
@@ -355,15 +383,15 @@ void jitter_measurement::print() {
     else
         snprintf(running_maxever_time_string, 128, "%s, %.1fs ago)",
                 maxever_time_string,
-                get_seconds() - pdin.maxever_time);
+                get_seconds() - pdin->maxever_time);
 
     log(info, "mean period: %4lluus, jitter mean:"
             " %2lluus, max %4lluus, max ever %4lluus%s\n",
-            cycle, avgjit, maxjit, pdin.maxever, running_maxever_time_string);
+            cycle, avgjit, maxjit, pdin->maxever, running_maxever_time_string);
 
-    if(new_maxever_time && new_maxever_command.size() && pdin.maxever > new_maxever_command_threshold) {
+    if(new_maxever_time && new_maxever_command.size() && pdin->maxever > new_maxever_command_threshold) {
         string cmd = format_string("%s %llu %s",
-                new_maxever_command.c_str(), pdin.maxever, maxever_time_string + 5);
+                new_maxever_command.c_str(), pdin->maxever, maxever_time_string + 5);
         log(info, "execute new_maxever_command: %s\n", cmd.c_str());
         system(cmd.c_str());
     }
@@ -395,10 +423,13 @@ void jitter_measurement::run() {
 int jitter_measurement::service_reset_max_ever(
         const robotkernel::service_arglist_t& request,
         robotkernel::service_arglist_t& response) {
+    auto& buf = pdin->get_write_buffer();
+    struct jitter_pdin *pdin = (struct jitter_pdin *)&buf[0];
+
 #define RESET_MAX_EVER_RESP_MAXEVER 0
-    response[RESET_MAX_EVER_RESP_MAXEVER] = pdin.maxever;
-    pdin.maxever = 0;
-    pdin.maxever_time = 0;
+    response[RESET_MAX_EVER_RESP_MAXEVER] = pdin->maxever;
+    pdin->maxever = 0;
+    pdin->maxever_time = 0;
     maxever_time_string[0] = 0;
 
     return 0;
@@ -428,6 +459,8 @@ const std::string jitter_measurement::service_definition_get_cps =
     "   uint32_t: cps\n";
 
 int jitter_measurement::set_state(module_state_t state) {
+    kernel& k = *kernel::get_instance();
+
     // get transition
     uint32_t transition = GEN_STATE(this->state, state);
     
@@ -439,6 +472,8 @@ int jitter_measurement::set_state(module_state_t state) {
         case op_2_init:
         case op_2_boot:
             // ====> stop sending commands
+            k.remove_process_data(pdout);
+
             if (state == module_state_safeop)
                 break;
         case safeop_2_preop:
@@ -446,6 +481,8 @@ int jitter_measurement::set_state(module_state_t state) {
         case safeop_2_boot:
             // ====> stop receiving measurements
             stop();
+
+            k.remove_process_data(pdin);
 
             if (state == module_state_preop)
                 break;
@@ -472,16 +509,21 @@ int jitter_measurement::set_state(module_state_t state) {
             if (state == module_state_preop)
                 break;
         case preop_2_op:
-        case preop_2_safeop:
+        case preop_2_safeop: {
             // ====> start receiving measurements
             if (threaded)
                 start();
+            
+            k.add_process_data(pdin);
 
             if (state == module_state_safeop)
                 break;
-        case safeop_2_op:
+        }
+        case safeop_2_op: {
             // ====> start sending commands           
+            k.add_process_data(pdout);
             break;
+        }
         case op_2_op:
         case safeop_2_safeop:
         case preop_2_preop:
@@ -502,8 +544,9 @@ int jitter_measurement::set_state(module_state_t state) {
 void jitter_measurement::get_pdin(
         service_provider::process_data_inspection::pd_t& pd) {
 
-    pd.resize(sizeof(pdin));
-    memcpy(&pd[0], &pdin, sizeof(pdin));
+    const auto& buf = pdin->get_read_buffer();
+    pd.resize(buf.size());
+    memcpy(&pd[0], &buf[0], buf.size());
 }
 
 //! return output process data (commands)
@@ -513,7 +556,8 @@ void jitter_measurement::get_pdin(
 void jitter_measurement::get_pdout(
         service_provider::process_data_inspection::pd_t& pd) {
 
-    pd.resize(sizeof(pdout));
-    memcpy(&pd[0], &pdout, sizeof(pdout));
+    const auto& buf = pdout->get_read_buffer();
+    pd.resize(buf.size());
+    memcpy(&pd[0], &buf[0], buf.size());
 }
 

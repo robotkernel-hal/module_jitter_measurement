@@ -96,11 +96,15 @@ class jitter_measurement :
             uint64_t last_cycle;
             uint64_t last_ts;
             double maxever_time; // unix timestamp of last maxever increment!
-        } pdin;
+        };
 
         struct jitter_pdout {
             uint64_t max_ever_clamp;
-        } pdout;
+        };
+    
+        // named process data
+        robotkernel::kernel::sp_process_data_t pdin;
+        robotkernel::kernel::sp_process_data_t pdout;
 
         //! yaml config construction
         /*!
