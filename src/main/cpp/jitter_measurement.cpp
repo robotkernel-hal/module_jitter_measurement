@@ -1,8 +1,6 @@
 //! robotkernel module jitter_measurement
 /*!
- * author: Robert Burger
- *
- * $Id$
+ * author: Robert Burger <robert.burger@dlr.de>
  */
 
 /*
@@ -146,6 +144,9 @@ jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node)
         log(error, "tty_control_signals not supported on this architecture!\n");
 #endif
     
+    // create trigger device for pdin
+//    pdin_t_dev = make_shared<trigger_base>(format_string("%s.pd.in.trigger", name));
+
     calibrate();
 }
 
@@ -166,6 +167,9 @@ jitter_measurement::~jitter_measurement() {
     // destroy ipc structures
     pthread_mutex_destroy(&sync_lock);
     pthread_cond_destroy(&sync_cond);
+
+    // destroy trigger device
+//    pdin_t_dev.reset();
 }
 
 void jitter_measurement::set_pulse_from_string(pulse_signals_t* which, std::string which_str) {
@@ -285,11 +289,16 @@ inline uint64_t get_timestamp() {
 void jitter_measurement::trigger() {
     do_pulse(pulse_on_trigger);
 
-    auto& buf = pdin->get_write_buffer();
-    struct jitter_pdin *pdin = (struct jitter_pdin *)&buf[0];
-    pdin->last_ts = get_timestamp();
+    // get actual timestamp
+    uint64_t ts = get_timestamp();
 
-    buffer[buffer_act][buffer_pos++] = pdin->last_ts;
+    auto& buf = pdin->get_write_buffer();
+    struct jitter_pdin *j_pdin = (struct jitter_pdin *)&buf[0];
+    j_pdin->last_ts = ts;
+    pdin->swap_buffers();
+//    pdin_t_dev->trigger_modules();
+
+    buffer[buffer_act][buffer_pos++] = ts;
     if (buffer_pos >= buffer_size) {
         buffer_pos = 0;
         buffer_act = (buffer_act + 1) % 2; 
@@ -492,6 +501,7 @@ int jitter_measurement::set_state(module_state_t state) {
             stop();
 
             k.remove_process_data(pdin);
+//            k.remove_trigger_device(pdin_t_dev);
 
             if (state == module_state_preop)
                 break;
@@ -523,6 +533,7 @@ int jitter_measurement::set_state(module_state_t state) {
             if (threaded)
                 start();
             
+//            k.add_trigger_device(pdin_t_dev);
             k.add_process_data(pdin);
 
             if (state == module_state_safeop)

@@ -102,6 +102,7 @@ class jitter_measurement :
         // named process data
         robotkernel::sp_process_data_t pdin;
         robotkernel::sp_process_data_t pdout;
+        robotkernel::sp_trigger_device_t pdin_t_dev;
 
         //! yaml config construction
         /*!
