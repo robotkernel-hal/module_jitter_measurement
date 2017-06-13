@@ -1,8 +1,6 @@
 //! robotkernel module jitter_measurement
 /*!
- * author: Robert Burger
- *
- * $Id$
+ * author: Robert Burger <robert.burger@dlr.de>
  */
 
 /*
@@ -44,7 +42,6 @@ namespace module_jitter_measurement {
 
 class jitter_measurement :
     public robotkernel::runnable,
-    //public robotkernel::trigger_base,
     public robotkernel::module_base,
     public service_provider::process_data_inspection::base {
 
@@ -103,8 +100,8 @@ class jitter_measurement :
         };
     
         // named process data
-        robotkernel::kernel::sp_process_data_t pdin;
-        robotkernel::kernel::sp_process_data_t pdout;
+        robotkernel::sp_process_data_t pdin;
+        robotkernel::sp_process_data_t pdout;
 
         //! yaml config construction
         /*!
