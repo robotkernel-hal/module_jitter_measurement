@@ -64,13 +64,13 @@ static const std::string pd_definition_pdout =
 "uint64_t last_ts\n"
 "double maxever_time\n";
 
-//#if !defined(NO_RDTSC)
-//uint64_t __rdtsc(void) {
-//    unsigned a, d;
-//    __asm__ volatile("rdtsc" : "=a" (a), "=d" (d));
-//    return ((uint64_t)a) | (((uint64_t)d) << 32);
-//}
-//#endif
+#if !defined(HAVE___RDTSC)
+uint64_t __rdtsc(void) {
+    unsigned a, d;
+    __asm__ volatile("rdtsc" : "=a" (a), "=d" (d));
+    return ((uint64_t)a) | (((uint64_t)d) << 32);
+}
+#endif
 
 //! yaml config construction
 /*!
@@ -106,14 +106,14 @@ jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node)
         "uint64_t: last_ts\n"
         "double: max_ever_time\n";
 
-    pdin = make_shared<robotkernel::process_data>(
+    pdin = make_shared<robotkernel::process_data_device>(
             sizeof(struct jitter_pdin), name, string("pd.in"), pdin_desc);
             
     // create named process data for outputs 
     string pdout_desc = 
         "uint64_t: max_ever_clamp\n";
 
-    pdout = make_shared<robotkernel::process_data>(
+    pdout = make_shared<robotkernel::process_data_device>(
             sizeof(struct jitter_pdout), name, string("pd.out"), pdout_desc);
 
     // create ipc structures
@@ -220,12 +220,12 @@ void jitter_measurement::register_services() {
 
 void jitter_measurement::register_pd() {
     kernel& k = *kernel::get_instance();
-	k.add_service_requester(std::shared_ptr<jitter_measurement>(this));
+	k.add_device(shared_from_this());
 }
     
 void jitter_measurement::unregister_pd() {
     kernel& k = *kernel::get_instance();
-	k.remove_service_requester(std::shared_ptr<jitter_measurement>(this));
+	k.remove_device(shared_from_this());
 }
 
 //! calibrate function for clocks per second
@@ -490,7 +490,7 @@ int jitter_measurement::set_state(module_state_t state) {
         case op_2_init:
         case op_2_boot:
             // ====> stop sending commands
-            k.remove_process_data(pdout);
+            k.remove_device(pdout);
 
             if (state == module_state_safeop)
                 break;
@@ -500,7 +500,7 @@ int jitter_measurement::set_state(module_state_t state) {
             // ====> stop receiving measurements
             stop();
 
-            k.remove_process_data(pdin);
+            k.remove_device(pdin);
 //            k.remove_trigger_device(pdin_t_dev);
 
             if (state == module_state_preop)
@@ -534,14 +534,14 @@ int jitter_measurement::set_state(module_state_t state) {
                 start();
             
 //            k.add_trigger_device(pdin_t_dev);
-            k.add_process_data(pdin);
+            k.add_device(pdin);
 
             if (state == module_state_safeop)
                 break;
         }
         case safeop_2_op: {
             // ====> start sending commands           
-            k.add_process_data(pdout);
+            k.add_device(pdout);
             break;
         }
         case op_2_op:

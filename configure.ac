@@ -33,7 +33,7 @@ AC_CHECK_HEADERS([stdlib.h string.h termios.h])
 AC_TYPE_SIZE_T
 
 # Checks for library functions.
-AC_CHECK_FUNCS([strdup])
+AC_CHECK_FUNCS([strdup __rdtsc])
 
 # Checks for library functions.
 AC_CHECK_LIB(dl, dlopen)

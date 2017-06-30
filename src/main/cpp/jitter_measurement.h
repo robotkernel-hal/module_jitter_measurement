@@ -41,6 +41,7 @@ namespace module_jitter_measurement {
 #endif
 
 class jitter_measurement :
+    public std::enable_shared_from_this<jitter_measurement>,
     public robotkernel::runnable,
     public robotkernel::module_base,
     public service_provider::process_data_inspection::base {
@@ -100,8 +101,8 @@ class jitter_measurement :
         };
     
         // named process data
-        robotkernel::sp_process_data_t pdin;
-        robotkernel::sp_process_data_t pdout;
+        robotkernel::sp_process_data_device_t pdin;
+        robotkernel::sp_process_data_device_t pdout;
         robotkernel::sp_trigger_device_t pdin_t_dev;
 
         //! yaml config construction
