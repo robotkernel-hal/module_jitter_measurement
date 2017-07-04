@@ -126,7 +126,7 @@ class jitter_measurement :
          *
          * if log buffer is full, output thread is triggered
          */
-        void trigger();
+        void tick();
 
         //! calibrate function for clocks per second
         void calibrate();

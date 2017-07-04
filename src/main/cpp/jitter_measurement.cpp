@@ -270,7 +270,7 @@ inline uint64_t get_timestamp() {
 #endif
 }
 
-void jitter_measurement::trigger() {
+void jitter_measurement::tick() {
     do_pulse(pulse_on_trigger);
 
     // get actual timestamp
