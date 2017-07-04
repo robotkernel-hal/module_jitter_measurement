@@ -106,14 +106,14 @@ jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node)
         "uint64_t: last_ts\n"
         "double: max_ever_time\n";
 
-    pdin = make_shared<robotkernel::process_data_device>(
+    pdin = make_shared<robotkernel::process_data>(
             sizeof(struct jitter_pdin), name, string("pd.in"), pdin_desc);
             
     // create named process data for outputs 
     string pdout_desc = 
         "uint64_t: max_ever_clamp\n";
 
-    pdout = make_shared<robotkernel::process_data_device>(
+    pdout = make_shared<robotkernel::process_data>(
             sizeof(struct jitter_pdout), name, string("pd.out"), pdout_desc);
 
     // create ipc structures
@@ -146,6 +146,15 @@ jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node)
     
     // create trigger device for pdin
 //    pdin_t_dev = make_shared<trigger_base>(format_string("%s.pd.in.trigger", name));
+
+    // register services
+    kernel& k = *kernel::get_instance();
+    k.add_service(name, "reset_max_ever",
+            service_definition_reset_max_ever,
+            std::bind(&jitter_measurement::service_reset_max_ever, this, _1, _2));
+    k.add_service(name, "get_cps",
+            service_definition_get_cps,
+            std::bind(&jitter_measurement::service_get_cps, this, _1, _2));
 
     calibrate();
 }
@@ -201,31 +210,6 @@ void jitter_measurement::do_pulse(pulse_signals_t which) {
             break;
     }
 #endif
-}
-
-//! register services
-void jitter_measurement::register_services() { 
-    stringstream base;
-    base << name << "."; 
-
-    // register services
-    kernel& k = *kernel::get_instance();
-    k.add_service(name, base.str() + "reset_max_ever",
-            service_definition_reset_max_ever,
-            std::bind(&jitter_measurement::service_reset_max_ever, this, _1, _2));
-    k.add_service(name, base.str() + "get_cps",
-            service_definition_get_cps,
-            std::bind(&jitter_measurement::service_get_cps, this, _1, _2));
-}
-
-void jitter_measurement::register_pd() {
-    kernel& k = *kernel::get_instance();
-	k.add_device(shared_from_this());
-}
-    
-void jitter_measurement::unregister_pd() {
-    kernel& k = *kernel::get_instance();
-	k.remove_device(shared_from_this());
 }
 
 //! calibrate function for clocks per second
@@ -501,7 +485,7 @@ int jitter_measurement::set_state(module_state_t state) {
             stop();
 
             k.remove_device(pdin);
-//            k.remove_trigger_device(pdin_t_dev);
+            k.remove_device(shared_from_this());
 
             if (state == module_state_preop)
                 break;
@@ -533,7 +517,8 @@ int jitter_measurement::set_state(module_state_t state) {
             if (threaded)
                 start();
             
-//            k.add_trigger_device(pdin_t_dev);
+            // add process data inspection and process data
+	        k.add_device(shared_from_this());
             k.add_device(pdin);
 
             if (state == module_state_safeop)

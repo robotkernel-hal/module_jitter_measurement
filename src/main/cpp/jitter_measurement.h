@@ -24,7 +24,6 @@
 #define __MODULE_JITTER_MEASSUREMENT_H__
 
 #include "robotkernel/runnable.h"
-#include "robotkernel/trigger_base.h"
 #include "robotkernel/module_base.h"
 
 #include "service_provider/process_data_inspection/base.h"
@@ -101,9 +100,9 @@ class jitter_measurement :
         };
     
         // named process data
-        robotkernel::sp_process_data_device_t pdin;
-        robotkernel::sp_process_data_device_t pdout;
-        robotkernel::sp_trigger_device_t pdin_t_dev;
+        robotkernel::sp_process_data_t pdin;
+        robotkernel::sp_process_data_t pdout;
+        robotkernel::sp_trigger_t pdin_t_dev;
 
         //! yaml config construction
         /*!
@@ -121,11 +120,6 @@ class jitter_measurement :
          * \return 0 on success
          */
         int set_state(module_state_t state);
-
-        //! register services
-        void register_services();
-        void register_pd();
-        void unregister_pd();
 
         //! module trigger callback
         /*! does one measurement
