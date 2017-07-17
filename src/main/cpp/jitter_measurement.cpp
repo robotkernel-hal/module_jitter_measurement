@@ -107,14 +107,14 @@ jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node)
         "double: max_ever_time\n";
 
     pdin = make_shared<robotkernel::process_data>(
-            sizeof(struct jitter_pdin), name, string("pd.in"), pdin_desc);
+            sizeof(struct jitter_pdin), name, string("inputs"), pdin_desc);
             
     // create named process data for outputs 
     string pdout_desc = 
         "uint64_t: max_ever_clamp\n";
 
     pdout = make_shared<robotkernel::process_data>(
-            sizeof(struct jitter_pdout), name, string("pd.out"), pdout_desc);
+            sizeof(struct jitter_pdout), name, string("outputs"), pdout_desc);
 
     // create ipc structures
     pthread_mutex_init(&sync_lock, NULL);
@@ -143,12 +143,14 @@ jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node)
     if (node["tty_control_signals"]) 
         log(error, "tty_control_signals not supported on this architecture!\n");
 #endif
+
+    kernel& k = *kernel::get_instance();    
     
     // create trigger device for pdin
-//    pdin_t_dev = make_shared<trigger_base>(format_string("%s.pd.in.trigger", name));
+    pdin_t_dev = make_shared<trigger>(name, "inputs");
+    k.add_device(pdin_t_dev);
 
     // register services
-    kernel& k = *kernel::get_instance();
     k.add_service(name, "reset_max_ever",
             service_definition_reset_max_ever,
             std::bind(&jitter_measurement::service_reset_max_ever, this, _1, _2));
@@ -178,7 +180,7 @@ jitter_measurement::~jitter_measurement() {
     pthread_cond_destroy(&sync_cond);
 
     // destroy trigger device
-//    pdin_t_dev.reset();
+    pdin_t_dev = nullptr;
 }
 
 void jitter_measurement::set_pulse_from_string(pulse_signals_t* which, std::string which_str) {
@@ -218,8 +220,10 @@ void jitter_measurement::calibrate() {
         return;
 
     buffer_pos  = 0;
-    auto& buf = pdin->get_write_buffer();
+    auto& buf = pdin->back_buffer();
     memset(&buf[0], 0, buf.size());
+    pdin->swap_back();
+
 #if !defined(NO_RDTSC)
     log(info, "calibrating clocks/sec...\n");
 
@@ -276,11 +280,11 @@ void jitter_measurement::tick() {
     // get actual timestamp
     uint64_t ts = get_timestamp();
 
-    auto& buf = pdin->get_write_buffer();
+    auto& buf = pdin->back_buffer();
     struct jitter_pdin *j_pdin = (struct jitter_pdin *)&buf[0];
     j_pdin->last_ts = ts;
-    pdin->swap_buffers();
-//    pdin_t_dev->trigger_modules();
+    pdin->swap_back();
+    pdin_t_dev->trigger_modules();
 
     buffer[buffer_act][buffer_pos++] = ts;
     if (buffer_pos >= buffer_size) {
@@ -326,10 +330,11 @@ void jitter_measurement::print() {
     uint64_t dev;
     uint64_t cycle = 0, avgjit = 0, maxjit = 0;
 
-    auto& buf = pdin->get_write_buffer();
+    auto& buf = pdin->back_buffer();
     struct jitter_pdin *pdin = (struct jitter_pdin *)&buf[0];
     
-    auto& bufout = pdout->get_read_buffer();
+    pdout->swap_front();
+    auto& bufout = pdout->front_buffer();
     struct jitter_pdout *pdout = (struct jitter_pdout *)&bufout[0];
 
 
@@ -397,6 +402,8 @@ void jitter_measurement::print() {
         log(info, "execute new_maxever_command: %s\n", cmd.c_str());
         system(cmd.c_str());
     }
+
+    this->pdin->swap_back();
 }
 
 //! handler function called if thread is running
@@ -425,7 +432,7 @@ void jitter_measurement::run() {
 int jitter_measurement::service_reset_max_ever(
         const robotkernel::service_arglist_t& request,
         robotkernel::service_arglist_t& response) {
-    auto& buf = pdin->get_write_buffer();
+    auto& buf = pdin->back_buffer();
     struct jitter_pdin *pdin = (struct jitter_pdin *)&buf[0];
 
 #define RESET_MAX_EVER_RESP_MAXEVER 0
@@ -433,6 +440,8 @@ int jitter_measurement::service_reset_max_ever(
     pdin->maxever = 0;
     pdin->maxever_time = 0;
     maxever_time_string[0] = 0;
+
+    this->pdin->swap_back();
 
     return 0;
 }
@@ -549,9 +558,8 @@ int jitter_measurement::set_state(module_state_t state) {
 void jitter_measurement::get_pdin(
         service_provider::process_data_inspection::pd_t& pd) {
 
-    const auto& buf = pdin->get_read_buffer();
-    pd.resize(buf.size());
-    memcpy(&pd[0], &buf[0], buf.size());
+    pd.resize(pdin->length);
+    pdin->read(&pd[0], pdout->length);
 }
 
 //! return output process data (commands)
@@ -561,8 +569,7 @@ void jitter_measurement::get_pdin(
 void jitter_measurement::get_pdout(
         service_provider::process_data_inspection::pd_t& pd) {
 
-    const auto& buf = pdout->get_read_buffer();
-    pd.resize(buf.size());
-    memcpy(&pd[0], &buf[0], buf.size());
+    pd.resize(pdout->length);
+    pdout->read(&pd[0], pdout->length);
 }
 
