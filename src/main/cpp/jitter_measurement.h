@@ -95,6 +95,8 @@ class jitter_measurement :
             double maxever_time; // unix timestamp of last maxever increment!
         };
 
+        struct jitter_pdin local_pdin;
+
         struct jitter_pdout {
             uint64_t max_ever_clamp;
         };

@@ -219,10 +219,7 @@ void jitter_measurement::calibrate() {
     if (cps != 1)
         return;
 
-    buffer_pos  = 0;
-    auto& buf = pdin->back_buffer();
-    memset(&buf[0], 0, buf.size());
-    pdin->swap_back();
+    memset(&local_pdin, 0, sizeof(local_pdin));
 
 #if !defined(NO_RDTSC)
     log(info, "calibrating clocks/sec...\n");
@@ -280,10 +277,8 @@ void jitter_measurement::tick() {
     // get actual timestamp
     uint64_t ts = get_timestamp();
 
-    auto& buf = pdin->back_buffer();
-    struct jitter_pdin *j_pdin = (struct jitter_pdin *)&buf[0];
-    j_pdin->last_ts = ts;
-    pdin->swap_back();
+    local_pdin.last_ts = ts;
+    pdin->write((uint8_t *)&local_pdin, sizeof(local_pdin));
     pdin_t_dev->trigger_modules();
 
     buffer[buffer_act][buffer_pos++] = ts;
@@ -329,14 +324,10 @@ void jitter_measurement::print() {
 
     uint64_t dev;
     uint64_t cycle = 0, avgjit = 0, maxjit = 0;
-
-    auto& buf = pdin->back_buffer();
-    struct jitter_pdin *pdin = (struct jitter_pdin *)&buf[0];
     
     pdout->swap_front();
     auto& bufout = pdout->front_buffer();
     struct jitter_pdout *pdout = (struct jitter_pdout *)&bufout[0];
-
 
     // calculate differences and sum of differences
     for (i = 0; i < buffer_size - 1; ++i) {
@@ -352,9 +343,9 @@ void jitter_measurement::print() {
         dev     = labs(log_diff[i] - cycle); 
         maxjit  = max(dev, maxjit);
         uint64_t this_maxjit = (uint64_t)(maxjit * fac);
-        if(this_maxjit > pdin->maxever) {
+        if(this_maxjit > local_pdin.maxever) {
             // new max ever!
-            pdin->maxever = this_maxjit;
+            local_pdin.maxever = this_maxjit;
             new_maxever_time = buffer[act_buf][i];
         }
         avgjit += (dev * dev);
@@ -364,25 +355,25 @@ void jitter_measurement::print() {
     avgjit = (uint64_t)(sqrt((double)avgjit) * fac);
     cycle  = (uint64_t)(cycle  * fac);
     maxjit = (uint64_t)(maxjit * fac);
-    pdin->last_cycle = cycle;
-    pdin->last_max = maxjit;
+    local_pdin.last_cycle = cycle;
+    local_pdin.last_max = maxjit;
 
     if(new_maxever_time) {
         do_pulse(pulse_on_new_max_ever);
         double seconds_ago = (get_timestamp() - new_maxever_time) / (double)cps;
         log(info, "new max ever is %.3fms ago\n", seconds_ago);
-        pdin->maxever_time = get_seconds() - seconds_ago;
-        time_t int_ts = (int)pdin->maxever_time;
+        local_pdin.maxever_time = get_seconds() - seconds_ago;
+        time_t int_ts = (int)local_pdin.maxever_time;
         struct tm* btime = localtime(&int_ts);
         strftime(maxever_time_string, 64, " (at %H:%M:%S", btime);
-        unsigned int part_second = (unsigned int)(10000 * (pdin->maxever_time - (int)pdin->maxever_time));
+        unsigned int part_second = (unsigned int)(10000 * (local_pdin.maxever_time - (int)local_pdin.maxever_time));
         if(part_second >= 10000)
             part_second = 9999;
         snprintf(maxever_time_string + strlen(maxever_time_string), 32, ".%04d", part_second);
     }
 
-    if(pdout->max_ever_clamp != 0 && pdin->maxever > pdout->max_ever_clamp)
-        pdin->maxever = pdout->max_ever_clamp;
+    if(pdout->max_ever_clamp != 0 && local_pdin.maxever > pdout->max_ever_clamp)
+        local_pdin.maxever = pdout->max_ever_clamp;
 
     char running_maxever_time_string[128];
     if(maxever_time_string[0] == 0)
@@ -390,20 +381,18 @@ void jitter_measurement::print() {
     else
         snprintf(running_maxever_time_string, 128, "%s, %.1fs ago)",
                 maxever_time_string,
-                get_seconds() - pdin->maxever_time);
+                get_seconds() - local_pdin.maxever_time);
 
     log(info, "mean period: %4lluus, jitter mean:"
             " %2lluus, max %4lluus, max ever %4lluus%s\n",
-            cycle, avgjit, maxjit, pdin->maxever, running_maxever_time_string);
+            cycle, avgjit, maxjit, local_pdin.maxever, running_maxever_time_string);
 
-    if(new_maxever_time && new_maxever_command.size() && pdin->maxever > new_maxever_command_threshold) {
+    if(new_maxever_time && new_maxever_command.size() && local_pdin.maxever > new_maxever_command_threshold) {
         string cmd = format_string("%s %llu %s",
-                new_maxever_command.c_str(), pdin->maxever, maxever_time_string + 5);
+                new_maxever_command.c_str(), local_pdin.maxever, maxever_time_string + 5);
         log(info, "execute new_maxever_command: %s\n", cmd.c_str());
         system(cmd.c_str());
     }
-
-    this->pdin->swap_back();
 }
 
 //! handler function called if thread is running
