@@ -421,25 +421,20 @@ void jitter_measurement::run() {
 int jitter_measurement::service_reset_max_ever(
         const robotkernel::service_arglist_t& request,
         robotkernel::service_arglist_t& response) {
-    auto& buf = pdin->back_buffer();
-    struct jitter_pdin *pdin = (struct jitter_pdin *)&buf[0];
-
 #define RESET_MAX_EVER_RESP_MAXEVER 0
     response.resize(1);
-    response[RESET_MAX_EVER_RESP_MAXEVER] = pdin->maxever;
+    response[RESET_MAX_EVER_RESP_MAXEVER] = local_pdin.maxever;
 
-    pdin->maxever = 0;
-    pdin->maxever_time = 0;
+    local_pdin.maxever = 0;
+    local_pdin.maxever_time = 0;
     maxever_time_string[0] = 0;
-
-    this->pdin->swap_back();
 
     return 0;
 }
 
 const std::string jitter_measurement::service_definition_reset_max_ever = 
     "response:\n"
-    "   uint32_t: maxever\n";
+    "   uint64_t: maxever\n";
 
 //! reset max ever
 /*!
