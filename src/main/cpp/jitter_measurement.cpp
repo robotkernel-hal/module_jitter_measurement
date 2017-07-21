@@ -425,7 +425,9 @@ int jitter_measurement::service_reset_max_ever(
     struct jitter_pdin *pdin = (struct jitter_pdin *)&buf[0];
 
 #define RESET_MAX_EVER_RESP_MAXEVER 0
+    response.resize(1);
     response[RESET_MAX_EVER_RESP_MAXEVER] = pdin->maxever;
+
     pdin->maxever = 0;
     pdin->maxever_time = 0;
     maxever_time_string[0] = 0;
