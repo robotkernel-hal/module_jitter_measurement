@@ -78,7 +78,7 @@ uint64_t __rdtsc(void) {
  * \param node yaml node
  */
 jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node) 
-: runnable(0, 0), module_base("module_jitter_measurement", name, node), 
+: runnable(0, 0, name), module_base("module_jitter_measurement", name, node), 
   service_provider::process_data_inspection::base(name, "jitter") {
     buffer_size     = get_as<unsigned int>(node, "buffer_size");
     buffer[0]       = new uint64_t[buffer_size];
