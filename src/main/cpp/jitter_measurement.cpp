@@ -106,14 +106,14 @@ jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node)
         "uint64_t: last_ts\n"
         "double: max_ever_time\n";
 
-    pdin = make_shared<robotkernel::process_data>(
+    pdin = make_shared<robotkernel::triple_buffer>(
             sizeof(struct jitter_pdin), name, string("inputs"), pdin_desc);
             
     // create named process data for outputs 
     string pdout_desc = 
         "uint64_t: max_ever_clamp\n";
 
-    pdout = make_shared<robotkernel::process_data>(
+    pdout = make_shared<robotkernel::triple_buffer>(
             sizeof(struct jitter_pdout), name, string("outputs"), pdout_desc);
 
     // create ipc structures
@@ -278,7 +278,7 @@ void jitter_measurement::tick() {
     uint64_t ts = get_timestamp();
 
     local_pdin.last_ts = ts;
-    pdin->write((uint8_t *)&local_pdin, sizeof(local_pdin));
+    pdin->write(0, (uint8_t *)&local_pdin, sizeof(local_pdin));
     pdin_t_dev->trigger_modules();
 
     buffer[buffer_act][buffer_pos++] = ts;
@@ -325,9 +325,7 @@ void jitter_measurement::print() {
     uint64_t dev;
     uint64_t cycle = 0, avgjit = 0, maxjit = 0;
     
-    pdout->swap_front();
-    auto& bufout = pdout->front_buffer();
-    struct jitter_pdout *pdout = (struct jitter_pdout *)&bufout[0];
+    struct jitter_pdout *local_pdout = (struct jitter_pdout *)pdout->pop();
 
     // calculate differences and sum of differences
     for (i = 0; i < buffer_size - 1; ++i) {
@@ -372,8 +370,8 @@ void jitter_measurement::print() {
         snprintf(maxever_time_string + strlen(maxever_time_string), 32, ".%04d", part_second);
     }
 
-    if(pdout->max_ever_clamp != 0 && local_pdin.maxever > pdout->max_ever_clamp)
-        local_pdin.maxever = pdout->max_ever_clamp;
+    if (local_pdout->max_ever_clamp != 0 && local_pdin.maxever > local_pdout->max_ever_clamp)
+        local_pdin.maxever = local_pdout->max_ever_clamp;
 
     char running_maxever_time_string[128];
     if(maxever_time_string[0] == 0)
@@ -545,7 +543,7 @@ void jitter_measurement::get_pdin(
         service_provider::process_data_inspection::pd_t& pd) {
 
     pd.resize(pdin->length);
-    pdin->read(&pd[0], pdout->length);
+    pdin->read(0, &pd[0], pdin->length, false);
 }
 
 //! return output process data (commands)
@@ -556,6 +554,6 @@ void jitter_measurement::get_pdout(
         service_provider::process_data_inspection::pd_t& pd) {
 
     pd.resize(pdout->length);
-    pdout->read(&pd[0], pdout->length);
+    pdout->read(0, &pd[0], pdout->length, false);
 }
 
