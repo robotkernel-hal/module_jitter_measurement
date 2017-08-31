@@ -148,7 +148,6 @@ jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node)
     
     // create trigger device for pdin
     pdin_t_dev = make_shared<trigger>(name, "inputs");
-    k.add_device(pdin_t_dev);
 
     // register services
     k.add_service(name, "reset_max_ever",
@@ -477,6 +476,7 @@ int jitter_measurement::set_state(module_state_t state) {
             // ====> stop receiving measurements
             stop();
 
+            k.remove_device(pdin_t_dev);
             k.remove_device(pdin);
             k.remove_device(shared_from_this());
 
@@ -513,6 +513,7 @@ int jitter_measurement::set_state(module_state_t state) {
             // add process data inspection and process data
 	        k.add_device(shared_from_this());
             k.add_device(pdin);
+            k.add_device(pdin_t_dev);
 
             if (state == module_state_safeop)
                 break;
