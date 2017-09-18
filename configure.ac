@@ -39,6 +39,7 @@ AC_CHECK_FUNCS([strdup __rdtsc])
 AC_CHECK_LIB(dl, dlopen)
 
 AC_CONFIG_FILES([Makefile src/main/cpp/Makefile module_jitter_measurement.pc])
+AC_CONFIG_FILES([share/ln/module_jitter_measurement.inc.lnc], [cp share/ln/module_jitter_measurement.inc.lnc ${ac_abs_top_srcdir}/share/ln/])
 
 AC_OUTPUT
 
