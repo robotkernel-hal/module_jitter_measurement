@@ -1,18 +1,18 @@
 requires_version 0.2.43
 # this include file can be customized with the following defines:
 #   module_jitter_measurement_base
-#     (optional) path to module_jitter_measurement base directory
-#     e.g. /volume/software/robotkernel/packages/module_jitter_measurement/3.0.1
+#     (optional) path to module-posix-timer-base-directory
+#     e.g. /volume/software/common/packages/module_jitter_measurement/latest
+#     or to a local reltool path,
+#     or to a local install like: /home/schm_fl/workspace/module_jitter_measurement/build/sled11-x86-gcc4.x
 #     defaults to rmpm structure
-#   module_jitter_measurement_libdir
-#     (optional) add custom module search paths
 
 defines
-module_jitter_measurement_base: %(dirname %(dirname %(CURDIR)))
-module_jitter_measurement_base_type: %(ifexists "%(module_jitter_measurement_base)/lib/libmodule_jitter_measurement.so", "local_install", "rmpm_release")
-module_jitter_measurement_libdir: %(ifeq "%(module_jitter_measurement_base_type)", "local_install", "%(module_jitter_measurement_base)/lib", "%(module_jitter_measurement_base)/lib/$(ARCH)")
-add_message_definition_dir: %(module_jitter_measurement_base)/share/ln/message_definitions
+module_jitter_measurement_base:          %(dirname %(dirname %(CURDIR)))
+module_jitter_measurement_libdir:        %(subst "${exec_prefix}/", "", "@libdir@")
+module_jitter_measurement_type:          %(ifexists "%(module_jitter_measurement_base)/%(module_jitter_measurement_libdir)/libmodule_jitter_measurement.so", "local_install", "rmpm_release")
+module_jitter_measurement_library_path:  %(ifeq "%(module_jitter_measurement_type)", "local_install", "%(_base)/%(module_jitter_measurement_libdir)", "%(module_jitter_measurement_base)/lib/$(ARCH)")
 
-ifndef rk_modules: rk_modules: ""
-rk_modules: %(rk_modules):%(module_jitter_measurement_libdir)
+ifndef rk_library_path: rk_library_path: ""
+rk_library_path: %(rk_library_path):%(module_jitter_measurement_library_path)
 
