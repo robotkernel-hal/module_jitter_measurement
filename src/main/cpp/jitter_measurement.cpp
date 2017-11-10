@@ -419,8 +419,8 @@ int jitter_measurement::service_reset_max_ever(
 }
 
 const std::string jitter_measurement::service_definition_reset_max_ever = 
-    "response:\n"
-    "   uint64_t: maxever\n";
+"response:\n"
+"- uint64_t: maxever\n";
 
 //! reset max ever
 /*!
@@ -438,8 +438,8 @@ int jitter_measurement::service_get_cps(
 }
 
 const std::string jitter_measurement::service_definition_get_cps =
-    "response:\n"
-    "   uint32_t: cps\n";
+"response:\n"
+"- uint32_t: cps\n";
 
 int jitter_measurement::set_state(module_state_t state) {
     kernel& k = *kernel::get_instance();
