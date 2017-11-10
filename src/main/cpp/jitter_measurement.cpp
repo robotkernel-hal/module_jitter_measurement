@@ -51,18 +51,18 @@ using namespace module_jitter_measurement;
 using namespace string_util;
         
 static const std::string pd_definition_pdin = 
-"uint64_t maxever\n"
-"uint64_t last_max\n"
-"uint64_t last_cycle\n"
-"uint64_t last_ts\n"
-"double maxever_time\n";
+"- uint64_t: maxever\n"
+"- uint64_t: last_max\n"
+"- uint64_t: last_cycle\n"
+"- uint64_t: last_ts\n"
+"- double: maxever_time\n";
 
 static const std::string pd_definition_pdout = 
-"uint64_t maxever\n"
-"uint64_t last_max\n"
-"uint64_t last_cycle\n"
-"uint64_t last_ts\n"
-"double maxever_time\n";
+"- uint64_t: maxever\n"
+"- uint64_t: last_max\n"
+"- uint64_t: last_cycle\n"
+"- uint64_t: last_ts\n"
+"- double: maxever_time\n";
 
 #if !defined(HAVE___RDTSC)
 uint64_t __rdtsc(void) {
