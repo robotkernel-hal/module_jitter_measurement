@@ -64,11 +64,17 @@ static const std::string pd_definition_pdout =
 "- uint64_t: last_ts\n"
 "- double: maxever_time\n";
 
-#if !defined(HAVE___RDTSC)
-uint64_t __rdtsc(void) {
+#if defined ARCH_INTEL
+uint64_t jm_rdtsc(void) {
     unsigned a, d;
     __asm__ volatile("rdtsc" : "=a" (a), "=d" (d));
     return ((uint64_t)a) | (((uint64_t)d) << 32);
+}
+#else
+uint64_t jm_rdtsc(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    return (uint64_t)(ts.tv_sec * 1e9 + ts.tv_nsec);
 }
 #endif
 
@@ -220,33 +226,22 @@ void jitter_measurement::calibrate() {
 
     memset(&local_pdin, 0, sizeof(local_pdin));
 
-#if !defined(NO_RDTSC)
     log(info, "calibrating clocks/sec...\n");
 
-#ifdef __VXWORKS__
-    taskDelay(1);
-    uint64_t begin = __rdtsc();
-    taskDelay(1);
-    cps = (uint64_t)((__rdtsc() - begin - 1.2E5) * sysClkRateGet());
-#else
     struct timespec ts_time;
     clock_gettime(CLOCK_REALTIME, &ts_time);
     double begin_time = (double)ts_time.tv_sec + (ts_time.tv_nsec / 1E9);
-    uint64_t begin = __rdtsc();
+    uint64_t begin = jm_rdtsc();
 
     struct timespec ts = { 0, 10000000 };
     nanosleep(&ts, NULL);
     
     clock_gettime(CLOCK_REALTIME, &ts_time);
     double end_time = (double)ts_time.tv_sec + (ts_time.tv_nsec / 1E9);
-    uint64_t end = __rdtsc();
+    uint64_t end = jm_rdtsc();
     log(info, "got %17.13f sec diff\n", (end_time - begin_time));
     cps = (end - begin) / (end_time - begin_time); // magic factor to correct cps
-#endif
     log(info, "got %llu clock/sec\n", cps);
-#else
-    cps = 1e9;
-#endif
 }
 
 //! does one measurement
@@ -261,13 +256,7 @@ inline double get_seconds() {
 }
 
 inline uint64_t get_timestamp() {
-#if !defined(NO_RDTSC)
-    return __rdtsc();
-#else
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    return (uint64_t)(ts.tv_sec * 1e9 + ts.tv_nsec);
-#endif
+    return jm_rdtsc();
 }
 
 void jitter_measurement::tick() {

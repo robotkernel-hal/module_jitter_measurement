@@ -33,10 +33,29 @@ AC_CHECK_HEADERS([stdlib.h string.h termios.h])
 AC_TYPE_SIZE_T
 
 # Checks for library functions.
-AC_CHECK_FUNCS([strdup __rdtsc])
+AC_CHECK_FUNCS([strdup])
 
 # Checks for library functions.
 AC_CHECK_LIB(dl, dlopen)
+
+# Platform specific setup
+# Check for which host we are on and setup a few things
+# specifically based on the host
+AC_CANONICAL_TARGET
+case $target in
+    *arm* )
+        AC_DEFINE([ARCH_ARM], [], [Defined if the target CPU is arm])
+        ;;
+    *amd64* )
+        AC_DEFINE([ARCH_INTEL], [], [Defined if the target CPU is intel])
+        ;;
+    *i?86* )
+        AC_DEFINE([ARCH_INTEL], [], [Defined if the target CPU is intel])
+        ;;
+    *x86_64* )
+        AC_DEFINE([ARCH_INTEL], [], [Defined if the target CPU is intel])
+        ;;
+esac
 
 AC_CONFIG_FILES([Makefile src/main/cpp/Makefile module_jitter_measurement.pc])
 AC_CONFIG_FILES([share/ln/module_jitter_measurement.inc.lnc], [cp share/ln/module_jitter_measurement.inc.lnc ${ac_abs_top_srcdir}/share/ln/])
