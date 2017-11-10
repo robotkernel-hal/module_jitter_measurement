@@ -11,7 +11,7 @@ defines
 module_jitter_measurement_base:          %(dirname %(dirname %(CURDIR)))
 module_jitter_measurement_libdir:        %(subst "${exec_prefix}/", "", "@libdir@")
 module_jitter_measurement_type:          %(ifexists "%(module_jitter_measurement_base)/%(module_jitter_measurement_libdir)/libmodule_jitter_measurement.so", "local_install", "rmpm_release")
-module_jitter_measurement_library_path:  %(ifeq "%(module_jitter_measurement_type)", "local_install", "%(_base)/%(module_jitter_measurement_libdir)", "%(module_jitter_measurement_base)/lib/$(ARCH)")
+module_jitter_measurement_library_path:  %(ifeq "%(module_jitter_measurement_type)", "local_install", "%(module_jitter_measurement_base)/%(module_jitter_measurement_libdir)", "%(module_jitter_measurement_base)/lib/$(ARCH)")
 
 ifndef rk_library_path: rk_library_path: ""
 rk_library_path: %(rk_library_path):%(module_jitter_measurement_library_path)
