@@ -30,6 +30,9 @@
 
 #include "yaml-cpp/yaml.h"
 
+#include <mutex>
+#include <condition_variable>
+
 #ifdef HAVE_TERMIOS_H
 #include "tty_control_signals.h"
 #endif
@@ -51,13 +54,14 @@ class jitter_measurement :
         unsigned int buffer_pos;
 
         //! memory buffer for jitter measurement
-        uint64_t *buffer[2];
-        uint64_t *log_diff;
+        typedef std::vector<uint64_t> log_vec_t;
+        log_vec_t buffer[2];
+        log_vec_t log_diff;
         uint64_t cps;
 
         //! print thread sync
-        pthread_mutex_t sync_lock;
-        pthread_cond_t sync_cond;
+        std::mutex              sync_mtx;
+        std::condition_variable sync_cond;
 
         //! print last buffer measurement values
         void print();

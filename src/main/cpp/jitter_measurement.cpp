@@ -30,7 +30,6 @@
 #include <iostream>
 #include <semaphore.h>
 #include <signal.h>
-#include <pthread.h>
 #include <math.h>
 
 #ifdef __VXWORKS__
@@ -87,22 +86,20 @@ jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node)
 : runnable(0, 0, name), module_base("module_jitter_measurement", name, node), 
   service_provider::process_data_inspection::base(name, "jitter") {
     buffer_size     = get_as<unsigned int>(node, "buffer_size");
-    buffer[0]       = new uint64_t[buffer_size];
-    buffer[1]       = new uint64_t[buffer_size];
-    log_diff        = new uint64_t[buffer_size];
     buffer_pos      = 0;
     buffer_act      = 0;
     cps             = get_as<uint64_t>(node, "cps", 1);
     threaded        = get_as<bool>(node, "threaded", true);
 
+    // resize buffers
+    buffer[0].resize(buffer_size);
+    buffer[1].resize(buffer_size);
+    log_diff.resize(buffer_size);
+
     new_maxever_command = 
         get_as<string>(node, "new_maxever_command", string(""));
     new_maxever_command_threshold = 
         get_as<int>(node, "new_maxever_command_threshold", 50);
-
-    memset(buffer[0], 0, sizeof(uint64_t) * buffer_size);
-    memset(buffer[1], 0, sizeof(uint64_t) * buffer_size);
-    memset(log_diff, 0, sizeof(uint64_t) * buffer_size);
 
     // create named process data for inputs
     string pdin_desc = 
@@ -121,10 +118,6 @@ jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node)
 
     pdout = make_shared<robotkernel::triple_buffer>(
             sizeof(struct jitter_pdout), name, string("outputs"), pdout_desc);
-
-    // create ipc structures
-    pthread_mutex_init(&sync_lock, NULL);
-    pthread_cond_init(&sync_cond, NULL);
 
     // set state to init
     state = module_state_init;
@@ -168,22 +161,10 @@ jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node)
 
 //! default destruction
 jitter_measurement::~jitter_measurement() {
-    if (buffer[0]) 
-        delete[] buffer[0];
-    if (buffer[1]) 
-        delete[] buffer[1];
-
-    if (log_diff)
-        delete[] log_diff;
-
 #ifdef HAVE_TERMIOS_H
     if(tty_port)
         delete tty_port;
 #endif    
-    // destroy ipc structures
-    pthread_mutex_destroy(&sync_lock);
-    pthread_cond_destroy(&sync_cond);
-
     // destroy trigger device
     pdin_t_dev = nullptr;
 }
@@ -275,7 +256,7 @@ void jitter_measurement::tick() {
         buffer_act = (buffer_act + 1) % 2; 
 
         if (threaded)
-            pthread_cond_signal(&sync_cond);
+            sync_cond.notify_one();
         else
             print();
     }
@@ -308,7 +289,7 @@ double jitter_measurement::last_measurement() {
 //! print last buffer measurement values
 void jitter_measurement::print() {
     unsigned int i;
-    int act_buf = (buffer_act + 1) % 2;
+    log_vec_t& act_buf = buffer[(buffer_act + 1) % 2];
 
     uint64_t dev;
     uint64_t cycle = 0, avgjit = 0, maxjit = 0;
@@ -316,23 +297,22 @@ void jitter_measurement::print() {
     struct jitter_pdout *local_pdout = (struct jitter_pdout *)pdout->pop();
 
     // calculate differences and sum of differences
-    for (i = 0; i < buffer_size - 1; ++i) {
-        log_diff[i]  = buffer[act_buf][i+1] - buffer[act_buf][i];
-        cycle       += log_diff[i];
-    }
+    std::adjacent_difference(act_buf.begin(), act_buf.end(), log_diff.begin());
+    cycle = std::accumulate(log_diff.begin() + 1, log_diff.end(), 0);
     cycle /= buffer_size - 1;
 
     // calculating maximum deviation
     double fac = (1E6 / (double)cps);
     uint64_t new_maxever_time = 0;
-    for (i = 0; i < buffer_size - 1; i++) {
+    for (int i = 1; i < buffer_size; i++) {
         dev     = labs(log_diff[i] - cycle); 
         maxjit  = max(dev, maxjit);
         uint64_t this_maxjit = (uint64_t)(maxjit * fac);
-        if(this_maxjit > local_pdin.maxever) {
+
+        if (this_maxjit > local_pdin.maxever) {
             // new max ever!
             local_pdin.maxever = this_maxjit;
-            new_maxever_time = buffer[act_buf][i];
+            new_maxever_time = act_buf[i - 1];
         }
         avgjit += (dev * dev);
     }
@@ -344,7 +324,7 @@ void jitter_measurement::print() {
     local_pdin.last_cycle = cycle;
     local_pdin.last_max = maxjit;
 
-    if(new_maxever_time) {
+    if (new_maxever_time) {
         do_pulse(pulse_on_new_max_ever);
         double seconds_ago = (get_timestamp() - new_maxever_time) / (double)cps;
         log(info, "new max ever is %.3fms ago\n", seconds_ago);
@@ -383,19 +363,15 @@ void jitter_measurement::print() {
 
 //! handler function called if thread is running
 void jitter_measurement::run() {
-    pthread_mutex_lock(&sync_lock);
+    std::unique_lock<std::mutex> lock(sync_mtx);
 
     while (running()) {
-        struct timespec ts;
-        clock_gettime(CLOCK_REALTIME, &ts);
-        ts.tv_sec++;
-        if (pthread_cond_timedwait(&sync_cond, &sync_lock, &ts) != 0)
+        if (sync_cond.wait_for(lock, std::chrono::seconds(1))
+                == std::cv_status::timeout)
             continue;
 
         print();
     }
-
-    pthread_mutex_unlock(&sync_lock);
 }
 
 //! reset max ever
@@ -465,9 +441,9 @@ int jitter_measurement::set_state(module_state_t state) {
             // ====> stop receiving measurements
             stop();
 
-            k.remove_device(pdin_t_dev);
-            k.remove_device(pdin);
-            k.remove_device(shared_from_this());
+            k.remove_device(pdin_t_dev);         // trigger device pd inputs
+            k.remove_device(pdin);               // pd inputs
+            k.remove_device(shared_from_this()); // process data inspection
 
             if (state == module_state_preop)
                 break;
@@ -494,24 +470,22 @@ int jitter_measurement::set_state(module_state_t state) {
             if (state == module_state_preop)
                 break;
         case preop_2_op:
-        case preop_2_safeop: {
+        case preop_2_safeop:
             // ====> start receiving measurements
             if (threaded)
                 start();
             
             // add process data inspection and process data
-	        k.add_device(shared_from_this());
-            k.add_device(pdin);
-            k.add_device(pdin_t_dev);
+            k.add_device(shared_from_this());   // process data inspection
+            k.add_device(pdin);                 // pd inputs
+            k.add_device(pdin_t_dev);           // trigger device pd inputs
 
             if (state == module_state_safeop)
                 break;
-        }
-        case safeop_2_op: {
-            // ====> start sending commands           
+        case safeop_2_op:
+            // ====> start sending commands
             k.add_device(pdout);
             break;
-        }
         case op_2_op:
         case safeop_2_safeop:
         case preop_2_preop:
