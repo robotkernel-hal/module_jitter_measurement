@@ -9,5 +9,4 @@ libmodule_jitter_measurement_la_LDFLAGS  = -Wall -release $(PACKAGE_VERSION)
 
 install-exec-hook:
 	mkdir -p $(prefix)/share/ln
-	-cp -rf $(top_srcdir)/share/ln/* $(prefix)/share/ln/
 	-cp -rf $(top_builddir)/share/ln/* $(prefix)/share/ln/
