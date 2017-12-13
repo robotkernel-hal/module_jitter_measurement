@@ -22,6 +22,7 @@
 
 #include "jitter_measurement.h"
 #include "robotkernel/helpers.h"
+#include "config.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -297,8 +298,10 @@ void jitter_measurement::print() {
     struct jitter_pdout *local_pdout = (struct jitter_pdout *)pdout->pop();
 
     // calculate differences and sum of differences
-    std::adjacent_difference(act_buf.begin(), act_buf.end(), log_diff.begin());
-    cycle = std::accumulate(log_diff.begin() + 1, log_diff.end(), 0);
+    for (int i = 0; i < buffer_size - 1; ++i) {
+        log_diff[i+1] = act_buf[i+1] - act_buf[i];
+        cycle += log_diff[i+1];
+    }
     cycle /= buffer_size - 1;
 
     // calculating maximum deviation
@@ -366,7 +369,7 @@ void jitter_measurement::run() {
     std::unique_lock<std::mutex> lock(sync_mtx);
 
     while (running()) {
-        if (sync_cond.wait_for(lock, std::chrono::seconds(1))
+        if (sync_cond.wait_for(lock, std::chrono::seconds(10))
                 == std::cv_status::timeout)
             continue;
 
