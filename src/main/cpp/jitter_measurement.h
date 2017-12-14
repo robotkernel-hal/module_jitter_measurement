@@ -36,10 +36,6 @@
 
 #include "config.h"
 
-#ifdef HAVE_TERMIOS_H
-#include "tty_control_signals.h"
-#endif
-
 namespace module_jitter_measurement {
 #ifdef EMACS
 }
@@ -80,24 +76,11 @@ class jitter_measurement :
     public:
         size_t buffer_size;       //! size of jitter measurement buffer
         bool threaded;
-        bool is_printing;
-        char maxever_time_string[64];
-        std::string new_maxever_command;
-        unsigned int new_maxever_command_threshold;
-#ifdef HAVE_TERMIOS_H
-        tty_control_signals* tty_port;
-#endif
-        enum pulse_signals_t {
-            NO_PULSE,
-            PULSE_RTS,
-            PULSE_DTR,
-            PULSE_RTS_NEG,
-            PULSE_DTR_NEG
-        };
-        pulse_signals_t pulse_on_trigger;
-        pulse_signals_t pulse_on_new_max_ever;
-        void set_pulse_from_string(pulse_signals_t* which, std::string which_str);
-        void do_pulse(pulse_signals_t which);
+
+#define MAXEVER_TIME_STRING_SIZE    128
+        char maxever_time_string[MAXEVER_TIME_STRING_SIZE];
+
+        double new_maxever_threshold; //!< threshold for trigger on new maxever
 
         struct jitter_pdin {
             double maxever;         //! max ever seen jitter
@@ -117,6 +100,7 @@ class jitter_measurement :
         robotkernel::sp_process_data_t pdin;
         robotkernel::sp_process_data_t pdout;
         robotkernel::sp_trigger_t pdin_t_dev;
+        robotkernel::sp_trigger_t maxever_t_dev;
 
         //! yaml config construction
         /*!
@@ -141,9 +125,6 @@ class jitter_measurement :
          * if log buffer is full, output thread is triggered
          */
         void tick();
-
-        //! returns last measuremente
-        double last_measurement();
 
         //! reset max ever
         /*!

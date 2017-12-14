@@ -52,35 +52,31 @@ using namespace string_util;
 jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node) 
 : runnable(0, 0, name), module_base("module_jitter_measurement", name, node), 
   service_provider::process_data_inspection::base(name, "jitter") {
-    buffer_size     = get_as<unsigned int>(node, "buffer_size");
-    buffer_pos      = 0;
-    buffer_act      = 0;
-    threaded        = get_as<bool>(node, "threaded", true);
+    buffer_size           = get_as<unsigned int>(node, "buffer_size", 1000);
+    buffer_pos            = 0;
+    buffer_act            = 0;
+    threaded              = get_as<bool>(node, "threaded", true);
+    new_maxever_threshold = get_as<double>(node, "new_maxever_threshold", 0.001);
 
     // resize buffers
     buffer[0].resize(buffer_size);
     buffer[1].resize(buffer_size);
     log_diff.resize(buffer_size);
 
-    new_maxever_command = 
-        get_as<string>(node, "new_maxever_command", string(""));
-    new_maxever_command_threshold = 
-        get_as<int>(node, "new_maxever_command_threshold", 50);
-
     // create named process data for inputs
     string pdin_desc = 
-        "double: max_ever\n"
-        "double: last_max\n"
-        "double: last_cycle\n"
-        "double: last_ts\n"
-        "double: max_ever_time\n";
+        "- double: max_ever\n"
+        "- double: last_max\n"
+        "- double: last_cycle\n"
+        "- double: last_ts\n"
+        "- double: max_ever_time\n";
 
     pdin = make_shared<robotkernel::triple_buffer>(
             sizeof(struct jitter_pdin), name, string("inputs"), pdin_desc);
-            
+
     // create named process data for outputs 
     string pdout_desc = 
-        "double: max_ever_clamp\n";
+        "- double: max_ever_clamp\n";
 
     pdout = make_shared<robotkernel::triple_buffer>(
             sizeof(struct jitter_pdout), name, string("outputs"), pdout_desc);
@@ -88,31 +84,13 @@ jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node)
     // set state to init
     state = module_state_init;
 
-    is_printing = false;
     maxever_time_string[0] = 0;
-
-    pulse_on_trigger = NO_PULSE;
-    pulse_on_new_max_ever = NO_PULSE;
-#ifdef HAVE_TERMIOS_H
-    if (node["tty_control_signals"]) {
-        const YAML::Node& tty_node = node["tty_control_signals"];
-        string port = get_as<string>(tty_node, "port", "/dev/ttyS0");
-        tty_port = new tty_control_signals(port.c_str());
-        string on_trigger = get_as<string>(tty_node, "pulse_on_trigger", "");
-        set_pulse_from_string(&pulse_on_trigger, on_trigger);
-        string on_new_me = get_as<string>(tty_node, "pulse_on_new_max_ever", "");
-        set_pulse_from_string(&pulse_on_new_max_ever, on_new_me);
-    } else
-        tty_port = NULL;
-#else
-    if (node["tty_control_signals"]) 
-        log(error, "tty_control_signals not supported on this architecture!\n");
-#endif
 
     kernel& k = *kernel::get_instance();    
     
     // create trigger device for pdin
-    pdin_t_dev = make_shared<trigger>(name, "inputs");
+    pdin_t_dev    = make_shared<trigger>(name, "inputs");
+    maxever_t_dev = make_shared<trigger>(name, "new_maxever");
 
     // register services
     k.add_service(name, "reset_max_ever",
@@ -122,48 +100,12 @@ jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node)
 
 //! default destruction
 jitter_measurement::~jitter_measurement() {
-#ifdef HAVE_TERMIOS_H
-    if(tty_port)
-        delete tty_port;
-#endif    
     // destroy trigger device
     pdin_t_dev = nullptr;
-}
-
-void jitter_measurement::set_pulse_from_string(pulse_signals_t* which, std::string which_str) {
-    if(which_str == "rts")
-        *which = PULSE_RTS;
-    else if(which_str == "rts_neg")
-        *which = PULSE_RTS_NEG;
-    else if(which_str == "dtr")
-        *which = PULSE_DTR;
-    else if(which_str == "dtr_neg")
-        *which = PULSE_DTR_NEG;
-}
-void jitter_measurement::do_pulse(pulse_signals_t which) {
-#ifdef HAVE_TERMIOS_H
-    switch(which) {
-        case PULSE_RTS:
-            tty_port->pulse_rts();
-            break;
-        case PULSE_RTS_NEG:
-            tty_port->pulse_rts_neg();
-            break;
-        case PULSE_DTR:
-            tty_port->pulse_dtr();
-            break;
-        case PULSE_DTR_NEG:
-            tty_port->pulse_dtr_neg();
-            break;
-        case NO_PULSE:
-            break;
-    }
-#endif
+    maxever_t_dev = nullptr;
 }
 
 void jitter_measurement::tick() {
-    do_pulse(pulse_on_trigger);
-
     // get actual timestamp
     auto now = std::chrono::high_resolution_clock::now();
 
@@ -183,29 +125,6 @@ void jitter_measurement::tick() {
         else
             print();
     }
-}
-
-//! returns last measuremente
-double jitter_measurement::last_measurement() { 
-    log_tp_t tick_act, tick_last;
-    int act_pos = buffer_pos;
-    int act_buf = buffer_act;
-
-    // get actual tick
-    if (act_pos == 0) {
-        act_pos = buffer_size - 1;
-        act_buf = (act_buf + 1) % 2;
-    }
-    tick_act = buffer[act_buf][act_pos--];
-
-    // get last tick
-    if (act_pos == 0) {
-        act_pos = buffer_size - 1;
-        act_buf = (act_buf + 1) % 2;
-    }
-    tick_last = buffer[act_buf][act_pos];
-
-    return std::chrono::duration<double>(tick_act - tick_last).count();
 }
 
 //! print last buffer measurement values
@@ -237,6 +156,9 @@ void jitter_measurement::print() {
             local_pdin.maxever = maxjit;
             new_maxever_time = act_buf[i - 1];
             have_new_maxever = true;
+        
+            if (local_pdin.maxever > new_maxever_threshold)
+                maxever_t_dev->trigger_modules();
         }
         avgjit += (dev * dev);
     }
@@ -246,47 +168,33 @@ void jitter_measurement::print() {
     local_pdin.last_max = maxjit;
 
     if (have_new_maxever) {
-        do_pulse(pulse_on_new_max_ever);
         maxever_time = new_maxever_time;
         auto now = std::chrono::high_resolution_clock::now();
         double seconds_ago = std::chrono::duration<double>(now - maxever_time).count();
         log(info, "new max ever is %.3fms ago\n", seconds_ago);
-//        local_pdin.maxever_time = new_maxever_time;//get_seconds() - seconds_ago;
-//        time_t int_ts = (int)local_pdin.maxever_time;
-//        struct tm* btime = localtime(&int_ts);
-//        strftime(maxever_time_string, 64, " (at %H:%M:%S", btime);
-//        unsigned int part_second = (unsigned int)(10000 * (local_pdin.maxever_time - (int)local_pdin.maxever_time));
-//        if(part_second >= 10000)
-//            part_second = 9999;
-//        snprintf(maxever_time_string + strlen(maxever_time_string), 32, ".%04d", part_second);
+
+        std::time_t t = std::chrono::high_resolution_clock::to_time_t(maxever_time);
+        int wr = snprintf(maxever_time_string, MAXEVER_TIME_STRING_SIZE, "%s", std::ctime(&t));
+        maxever_time_string[wr-1] = '\0';
     }
 
     if (local_pdout->max_ever_clamp != 0 && local_pdin.maxever > local_pdout->max_ever_clamp)
         local_pdin.maxever = local_pdout->max_ever_clamp;
 
-    char running_maxever_time_string[128];
+    char running_maxever_time_string[MAXEVER_TIME_STRING_SIZE];
     auto now = std::chrono::high_resolution_clock::now();
     double seconds_ago = std::chrono::duration<double>(now - maxever_time).count();
 
-    if (maxever_time_string[0] == 0) {
-        snprintf(running_maxever_time_string, 128, " (%.1fs ago)", seconds_ago);
-        //running_maxever_time_string[0] = 0;
-    } else {
-        snprintf(running_maxever_time_string, 128, "%s, %.1fs ago)",
-                maxever_time_string, seconds_ago);
-//                get_seconds() - local_pdin.maxever_time);
-    }
+    if (maxever_time_string[0] == 0)
+        snprintf(running_maxever_time_string, MAXEVER_TIME_STRING_SIZE, 
+                "(%.1fs ago)", seconds_ago);
+    else
+        snprintf(running_maxever_time_string, MAXEVER_TIME_STRING_SIZE, 
+                "(%s, %.1fs ago)", maxever_time_string, seconds_ago);
 
     log(info, "mean period: %4.0fus, jitter mean:"
-            " %4.0fus, max %4.0fus, max ever %4.0fus%s\n",
+            " %4.0fus, max %4.0fus, max ever %4.0fus %s\n",
             cycle*1E6, avgjit*1E6, maxjit*1E6, local_pdin.maxever*1E6, running_maxever_time_string);
-
-    if (have_new_maxever && new_maxever_command.size() && local_pdin.maxever > new_maxever_command_threshold) {
-        string cmd = format_string("%s %llu %s",
-                new_maxever_command.c_str(), local_pdin.maxever, maxever_time_string + 5);
-        log(info, "execute new_maxever_command: %s\n", cmd.c_str());
-        system(cmd.c_str());
-    }
 }
 
 //! handler function called if thread is running
@@ -350,6 +258,7 @@ int jitter_measurement::set_state(module_state_t state) {
             // ====> stop receiving measurements
             stop();
 
+            k.remove_device(maxever_t_dev);      // trigger device new maxever
             k.remove_device(pdin_t_dev);         // trigger device pd inputs
             k.remove_device(pdin);               // pd inputs
             k.remove_device(shared_from_this()); // process data inspection
@@ -388,6 +297,7 @@ int jitter_measurement::set_state(module_state_t state) {
             k.add_device(shared_from_this());   // process data inspection
             k.add_device(pdin);                 // pd inputs
             k.add_device(pdin_t_dev);           // trigger device pd inputs
+            k.add_device(maxever_t_dev);        // trigger device new maxever
 
             if (state == module_state_safeop)
                 break;
