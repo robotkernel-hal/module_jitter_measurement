@@ -31,7 +31,10 @@
 #include "yaml-cpp/yaml.h"
 
 #include <mutex>
+#include <chrono>
 #include <condition_variable>
+
+#include "config.h"
 
 #ifdef HAVE_TERMIOS_H
 #include "tty_control_signals.h"
@@ -54,10 +57,15 @@ class jitter_measurement :
         unsigned int buffer_pos;
 
         //! memory buffer for jitter measurement
-        typedef std::vector<uint64_t> log_vec_t;
-        log_vec_t buffer[2];
-        log_vec_t log_diff;
-        uint64_t cps;
+        typedef std::chrono::high_resolution_clock::time_point log_tp_t;
+        typedef std::vector<log_tp_t> log_tp_vec_t;
+        log_tp_vec_t buffer[2];
+        
+        typedef std::chrono::high_resolution_clock::duration log_dur_t;
+        typedef std::vector<log_dur_t> log_dur_vec_t;
+        log_dur_vec_t log_diff;
+        
+        log_tp_t maxever_time;
 
         //! print thread sync
         std::mutex              sync_mtx;
@@ -92,17 +100,17 @@ class jitter_measurement :
         void do_pulse(pulse_signals_t which);
 
         struct jitter_pdin {
-            uint64_t maxever;         //! max ever seen jitter
-            uint64_t last_max;
-            uint64_t last_cycle;
-            uint64_t last_ts;
+            double maxever;         //! max ever seen jitter
+            double last_max;
+            double last_cycle;
+            double last_ts;
             double maxever_time; // unix timestamp of last maxever increment!
         };
 
         struct jitter_pdin local_pdin;
 
         struct jitter_pdout {
-            uint64_t max_ever_clamp;
+            double max_ever_clamp;
         };
     
         // named process data
@@ -134,9 +142,6 @@ class jitter_measurement :
          */
         void tick();
 
-        //! calibrate function for clocks per second
-        void calibrate();
-
         //! returns last measuremente
         double last_measurement();
 
@@ -149,16 +154,6 @@ class jitter_measurement :
         int service_reset_max_ever(const robotkernel::service_arglist_t& request,
                 robotkernel::service_arglist_t& response);
         static const std::string service_definition_reset_max_ever;
-
-        //! reset max ever
-        /*!
-         * \param request service request data
-         * \param response service response data
-         * \return success
-         */
-        int service_get_cps(const robotkernel::service_arglist_t& request,
-                robotkernel::service_arglist_t& response);
-        static const std::string service_definition_get_cps;
 
         //! return input process data (measurements)
         /*!
