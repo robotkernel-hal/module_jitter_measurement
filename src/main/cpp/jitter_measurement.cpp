@@ -72,19 +72,26 @@ jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node)
         "- double: max_ever_time\n";
 
     pdin = make_shared<robotkernel::triple_buffer>(
-            sizeof(struct jitter_pdin), name, string("inputs"), pdin_desc);
+            sizeof(struct jitter_pdin), name, string("inputs"), pdin_desc,
+            format_string("%s.inputs.trigger", name));
 
     // create named process data for outputs 
     string pdout_desc = 
         "- double: max_ever_clamp\n";
 
     pdout = make_shared<robotkernel::triple_buffer>(
-            sizeof(struct jitter_pdout), name, string("outputs"), pdout_desc);
+            sizeof(struct jitter_pdout), name, string("outputs"), pdout_desc,
+            format_string("%s.outputs.trigger", name));
 
     // set state to init
     state = module_state_init;
 
     maxever_time_string[0] = 0;
+    local_pdin.maxever      = 0.;
+    local_pdin.last_max     = 0.;
+    local_pdin.last_cycle   = 0.;
+    local_pdin.last_ts      = 0.;
+    local_pdin.maxever_time = 0.;
 
     kernel& k = *kernel::get_instance();    
     
@@ -202,7 +209,7 @@ void jitter_measurement::run() {
     std::unique_lock<std::mutex> lock(sync_mtx);
 
     while (running()) {
-        if (sync_cond.wait_for(lock, std::chrono::seconds(10))
+        if (sync_cond.wait_for(lock, std::chrono::seconds(1))
                 == std::cv_status::timeout)
             continue;
 
@@ -232,7 +239,7 @@ int jitter_measurement::service_reset_max_ever(
 
 const std::string jitter_measurement::service_definition_reset_max_ever = 
 "response:\n"
-"- uint64_t: maxever\n";
+"- double: maxever\n";
 
 int jitter_measurement::set_state(module_state_t state) {
     kernel& k = *kernel::get_instance();
