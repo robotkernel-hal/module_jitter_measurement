@@ -62,47 +62,6 @@ jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node)
     buffer[0].resize(buffer_size);
     buffer[1].resize(buffer_size);
     log_diff.resize(buffer_size);
-
-    // create named process data for inputs
-    string pdin_desc = 
-        "- double: max_ever\n"
-        "- double: last_max\n"
-        "- double: last_cycle\n"
-        "- double: last_ts\n"
-        "- double: max_ever_time\n";
-
-    pdin = make_shared<robotkernel::triple_buffer>(
-            sizeof(struct jitter_pdin), name, string("inputs"), pdin_desc,
-            format_string("%s.inputs.trigger", name));
-
-    // create named process data for outputs 
-    string pdout_desc = 
-        "- double: max_ever_clamp\n";
-
-    pdout = make_shared<robotkernel::triple_buffer>(
-            sizeof(struct jitter_pdout), name, string("outputs"), pdout_desc,
-            format_string("%s.outputs.trigger", name));
-
-    // set state to init
-    state = module_state_init;
-
-    maxever_time_string[0] = 0;
-    local_pdin.maxever      = 0.;
-    local_pdin.last_max     = 0.;
-    local_pdin.last_cycle   = 0.;
-    local_pdin.last_ts      = 0.;
-    local_pdin.maxever_time = 0.;
-
-    kernel& k = *kernel::get_instance();    
-    
-    // create trigger device for pdin
-    pdin_t_dev    = make_shared<trigger>(name, "inputs");
-    maxever_t_dev = make_shared<trigger>(name, "new_maxever");
-
-    // register services
-    k.add_service(name, "reset_max_ever",
-            service_definition_reset_max_ever,
-            std::bind(&jitter_measurement::service_reset_max_ever, this, _1, _2));
 }
 
 //! default destruction
@@ -112,6 +71,53 @@ jitter_measurement::~jitter_measurement() {
     maxever_t_dev = nullptr;
 }
 
+//! additional init function
+void jitter_measurement::init() {
+    // create named process data for inputs
+    string pdin_desc = 
+        "- double: max_ever\n"
+        "- double: last_max\n"
+        "- double: last_cycle\n"
+        "- uint64_t: last_ts\n"
+        "- double: max_ever_time\n";
+
+    pdin_t_dev = make_shared<trigger>(name, "inputs");
+    pdin = make_shared<robotkernel::triple_buffer>(sizeof(struct jitter_pdin), 
+            name, string("inputs"), pdin_desc, pdin_t_dev->id());
+
+    provider_hash = pdin->set_provider(shared_from_this());
+
+    // create named process data for outputs 
+    string pdout_desc = 
+        "- double: max_ever_clamp\n";
+
+    pdout_t_dev = make_shared<trigger>(name, "outputs");
+    pdout = make_shared<robotkernel::triple_buffer>(sizeof(struct jitter_pdout), 
+            name, string("outputs"), pdout_desc, pdout_t_dev->id());
+
+    consumer_hash = pdout->set_consumer(shared_from_this());
+
+    // set state to init
+    state = module_state_init;
+
+    maxever_time_string[0] = 0;
+    local_pdin.maxever      = 0.;
+    local_pdin.last_max     = 0.;
+    local_pdin.last_cycle   = 0.;
+    local_pdin.last_ts      = 0;
+    local_pdin.maxever_time = 0.;
+
+    kernel& k = *kernel::get_instance();    
+    
+    // create trigger device for pdin
+    maxever_t_dev = make_shared<trigger>(name, "new_maxever");
+
+    // register services
+    k.add_service(name, "reset_max_ever",
+            service_definition_reset_max_ever,
+            std::bind(&jitter_measurement::service_reset_max_ever, this, _1, _2));
+}
+
 void jitter_measurement::tick() {
     // get actual timestamp
     auto now = std::chrono::high_resolution_clock::now();
@@ -119,7 +125,7 @@ void jitter_measurement::tick() {
     local_pdin.last_ts = std::chrono::duration_cast<
         std::chrono::nanoseconds>(now.time_since_epoch()).count();
 
-    pdin->write(0, (uint8_t *)&local_pdin, sizeof(local_pdin));
+    pdin->write(provider_hash, 0, (uint8_t *)&local_pdin, sizeof(local_pdin));
     pdin_t_dev->trigger_modules();
 
     buffer[buffer_act][buffer_pos++] = now;
@@ -141,7 +147,7 @@ void jitter_measurement::print() {
     double dev;
     double cycle = 0, avgjit = 0, maxjit = 0;
     
-    struct jitter_pdout *local_pdout = (struct jitter_pdout *)pdout->pop();
+    struct jitter_pdout *local_pdout = (struct jitter_pdout *)pdout->pop(consumer_hash);
 
     // calculate differences and sum of differences
     for (unsigned i = 0; i < buffer_size - 1; ++i) {
@@ -256,6 +262,7 @@ int jitter_measurement::set_state(module_state_t state) {
         case op_2_boot:
             // ====> stop sending commands
             k.remove_device(pdout);
+            k.remove_device(pdout_t_dev); 
 
             if (state == module_state_safeop)
                 break;
@@ -266,8 +273,8 @@ int jitter_measurement::set_state(module_state_t state) {
             stop();
 
             k.remove_device(maxever_t_dev);      // trigger device new maxever
-            k.remove_device(pdin_t_dev);         // trigger device pd inputs
             k.remove_device(pdin);               // pd inputs
+            k.remove_device(pdin_t_dev);         // trigger device pd inputs
             k.remove_device(shared_from_this()); // process data inspection
 
             if (state == module_state_preop)
@@ -302,14 +309,15 @@ int jitter_measurement::set_state(module_state_t state) {
             
             // add process data inspection and process data
             k.add_device(shared_from_this());   // process data inspection
-            k.add_device(pdin);                 // pd inputs
             k.add_device(pdin_t_dev);           // trigger device pd inputs
+            k.add_device(pdin);                 // pd inputs
             k.add_device(maxever_t_dev);        // trigger device new maxever
 
             if (state == module_state_safeop)
                 break;
         case safeop_2_op:
             // ====> start sending commands
+            k.add_device(pdout_t_dev); 
             k.add_device(pdout);
             break;
         case op_2_op:
@@ -333,7 +341,7 @@ void jitter_measurement::get_pdin(
         service_provider::process_data_inspection::pd_t& pd) {
 
     pd.resize(pdin->length);
-    pdin->read(0, &pd[0], pdin->length, false);
+    pdin->read(consumer_hash, 0, &pd[0], pdin->length, false);
 }
 
 //! return output process data (commands)
@@ -344,6 +352,6 @@ void jitter_measurement::get_pdout(
         service_provider::process_data_inspection::pd_t& pd) {
 
     pd.resize(pdout->length);
-    pdout->read(0, &pd[0], pdout->length, false);
+    pdout->read(consumer_hash, 0, &pd[0], pdout->length, false);
 }
 

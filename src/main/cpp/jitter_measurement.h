@@ -86,7 +86,7 @@ class jitter_measurement :
             double maxever;         //! max ever seen jitter
             double last_max;
             double last_cycle;
-            double last_ts;
+            uint64_t last_ts;
             double maxever_time; // unix timestamp of last maxever increment!
         };
 
@@ -98,8 +98,11 @@ class jitter_measurement :
     
         // named process data
         robotkernel::sp_process_data_t pdin;
-        robotkernel::sp_process_data_t pdout;
+        size_t provider_hash;
         robotkernel::sp_trigger_t pdin_t_dev;
+        robotkernel::sp_process_data_t pdout;
+        size_t consumer_hash;
+        robotkernel::sp_trigger_t pdout_t_dev;
         robotkernel::sp_trigger_t maxever_t_dev;
 
         //! yaml config construction
@@ -111,6 +114,9 @@ class jitter_measurement :
 
         //! default destruction
         ~jitter_measurement();
+
+        //! additional init function
+        void init();
 
         //! set module state
         /*
