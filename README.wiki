@@ -25,6 +25,8 @@ The jitter measurement module provides a cyclic process data with the actual mea
  - uint64_t: last_ts
  - double: max_ever_time
 
+ The process data device is named ''<name>.inputs.pd''.
+
 = Triggers =
 
 This modules provides two trigger devices
