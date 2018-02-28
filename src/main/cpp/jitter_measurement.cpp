@@ -49,9 +49,11 @@ using namespace string_util;
  * \param name name of jm
  * \param node yaml node
  */
-jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node) 
-: runnable(0, 0, name), module_base("module_jitter_measurement", name, node), 
-  service_provider::process_data_inspection::base(name, "jitter") {
+jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node) :
+    pd_provider(name), pd_consumer(name),
+    runnable(0, 0, name), module_base("module_jitter_measurement", name, node), 
+    service_provider::process_data_inspection::base(name, "jitter") 
+{
     buffer_size           = get_as<unsigned int>(node, "buffer_size", 1000);
     buffer_pos            = 0;
     buffer_act            = 0;

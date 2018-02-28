@@ -43,6 +43,8 @@ namespace module_jitter_measurement {
 
 class jitter_measurement :
     public std::enable_shared_from_this<jitter_measurement>,
+    public robotkernel::pd_provider,
+    public robotkernel::pd_consumer,
     public robotkernel::runnable,
     public robotkernel::module_base,
     public service_provider::process_data_inspection::base {
