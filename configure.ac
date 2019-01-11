@@ -24,7 +24,8 @@ m4_ifdef([PKG_PROG_PKG_CONFIG], [PKG_PROG_PKG_CONFIG])
 m4_ifdef([PKG_INSTALLDIR], [PKG_INSTALLDIR], [pkgconfigdir='${libdir}/pkgconfig' AC_SUBST([pkgconfigdir])])
 
 # Check dependencies
-RK_CHECK_MODULES
+PKG_CHECK_MODULES([ROBOTKERNEL], [robotkernel])
+PKG_CHECK_MODULES([SERVICE_PROVIDER_PROCESS_DATA_INSPECTION], [service_provider_process_data_inspection])
 
 # Checks for header files.
 AC_CHECK_HEADERS([stdlib.h string.h termios.h])
@@ -41,4 +42,3 @@ AC_CHECK_LIB(dl, dlopen)
 AC_CONFIG_FILES([Makefile src/main/cpp/Makefile module_jitter_measurement.pc share/ln/module_jitter_measurement.inc.lnc])
 
 AC_OUTPUT
-
