@@ -15,7 +15,7 @@ class MainProject(ConanFile):
     }
 
     generators = "pkg_config"
-    requires = "robotkernel/5.0.4-rc@robotkernel/unstable", "service_provider_process_data_inspection/5.0.1-rc@robotkernel/unstable", "yaml-cpp/0.6.1@jbeder/stable"
+    requires = "robotkernel/5.0.4-rc@robotkernel/unstable"
 
     def source(self):
         filedata = None
