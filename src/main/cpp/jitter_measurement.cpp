@@ -78,7 +78,7 @@ void jitter_measurement::tick() {
     // get actual timestamp
     auto now = std::chrono::high_resolution_clock::now();
 
-    std::unique_lock<std::mutex> lock(sync_mtx);
+    std::unique_lock<std::mutex> lock(devs_mtx);
 
     if (state < module_state_safeop)
         return;
@@ -242,7 +242,7 @@ int jitter_measurement::set_state(module_state_t state) {
             k.remove_device(pdin_t_dev);         // trigger device pd inputs
             k.remove_device(shared_from_this()); // process data inspection
 
-            std::unique_lock<std::mutex> lock(sync_mtx);
+            std::unique_lock<std::mutex> lock(devs_mtx);
 
             pdin->reset_provider(provider_hash);
             provider_hash = 0;
