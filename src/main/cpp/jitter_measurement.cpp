@@ -68,61 +68,20 @@ jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node)
 
 //! default destruction
 jitter_measurement::~jitter_measurement() {
-    // destroy trigger device
-    pdin_t_dev = nullptr;
-    maxever_t_dev = nullptr;
 }
 
 //! additional init function
 void jitter_measurement::init() {
-    // create named process data for inputs
-    string pdin_desc = 
-        "- double: max_ever\n"
-        "- double: last_max\n"
-        "- double: last_cycle\n"
-        "- uint64_t: last_ts\n"
-        "- double: max_ever_time\n";
-
-    pdin_t_dev = make_shared<trigger>(name, "inputs");
-    pdin = make_shared<robotkernel::triple_buffer>(sizeof(struct jitter_pdin), 
-            name, string("inputs"), pdin_desc, pdin_t_dev->id());
-
-    provider_hash = pdin->set_provider(shared_from_this());
-
-    // create named process data for outputs 
-    string pdout_desc = 
-        "- double: max_ever_clamp\n";
-
-    pdout_t_dev = make_shared<trigger>(name, "outputs");
-    pdout = make_shared<robotkernel::triple_buffer>(sizeof(struct jitter_pdout), 
-            name, string("outputs"), pdout_desc, pdout_t_dev->id());
-
-    consumer_hash = pdout->set_consumer(shared_from_this());
-
-    // set state to init
-    state = module_state_init;
-
-    maxever_time_string[0] = 0;
-    local_pdin.maxever      = 0.;
-    local_pdin.last_max     = 0.;
-    local_pdin.last_cycle   = 0.;
-    local_pdin.last_ts      = 0;
-    local_pdin.maxever_time = 0.;
-
-    kernel& k = *kernel::get_instance();    
-    
-    // create trigger device for pdin
-    maxever_t_dev = make_shared<trigger>(name, "new_maxever");
-
-    // register services
-    k.add_service(name, "reset_max_ever",
-            service_definition_reset_max_ever,
-            std::bind(&jitter_measurement::service_reset_max_ever, this, _1, _2));
 }
 
 void jitter_measurement::tick() {
     // get actual timestamp
     auto now = std::chrono::high_resolution_clock::now();
+
+    std::unique_lock<std::mutex> lock(devs_mtx);
+
+    if (state < module_state_safeop)
+        return;
 
     local_pdin.last_ts = std::chrono::duration_cast<
         std::chrono::nanoseconds>(now.time_since_epoch()).count();
@@ -270,17 +229,39 @@ int jitter_measurement::set_state(module_state_t state) {
                 break;
         case safeop_2_preop:
         case safeop_2_init:
-        case safeop_2_boot:
+        case safeop_2_boot: {
             // ====> stop receiving measurements
             stop();
+
+            do {
+                // wait until thread has stopped
+            } while (running());
 
             k.remove_device(maxever_t_dev);      // trigger device new maxever
             k.remove_device(pdin);               // pd inputs
             k.remove_device(pdin_t_dev);         // trigger device pd inputs
             k.remove_device(shared_from_this()); // process data inspection
 
+            std::unique_lock<std::mutex> lock(devs_mtx);
+
+            pdin->reset_provider(provider_hash);
+            provider_hash = 0;
+            pdin = nullptr;
+
+            pdout->reset_consumer(consumer_hash);
+            consumer_hash = 0;
+            pdout = nullptr;
+        
+            // destroy trigger device
+            pdin_t_dev = nullptr;
+            pdout_t_dev = nullptr;
+            maxever_t_dev = nullptr;
+
+            this->state = module_state_preop;
+
             if (state == module_state_preop)
                 break;
+        }
         case preop_2_init:
         case preop_2_boot:
             // ====> deinit devices
@@ -304,7 +285,49 @@ int jitter_measurement::set_state(module_state_t state) {
             if (state == module_state_preop)
                 break;
         case preop_2_op:
-        case preop_2_safeop:
+        case preop_2_safeop: {
+            // create named process data for inputs
+            string pdin_desc = 
+                "- double: max_ever\n"
+                "- double: last_max\n"
+                "- double: last_cycle\n"
+                "- uint64_t: last_ts\n"
+                "- double: max_ever_time\n";
+
+            pdin_t_dev = make_shared<trigger>(name, "inputs");
+            pdin = make_shared<robotkernel::triple_buffer>(sizeof(struct jitter_pdin), 
+                    name, string("inputs"), pdin_desc, pdin_t_dev->id());
+
+            provider_hash = pdin->set_provider(shared_from_this());
+
+            // create named process data for outputs 
+            string pdout_desc = 
+                "- double: max_ever_clamp\n";
+
+            pdout_t_dev = make_shared<trigger>(name, "outputs");
+            pdout = make_shared<robotkernel::triple_buffer>(sizeof(struct jitter_pdout), 
+                    name, string("outputs"), pdout_desc, pdout_t_dev->id());
+
+            consumer_hash = pdout->set_consumer(shared_from_this());
+
+            maxever_time_string[0] = 0;
+            local_pdin.maxever      = 0.;
+            local_pdin.last_max     = 0.;
+            local_pdin.last_cycle   = 0.;
+            local_pdin.last_ts      = 0;
+            local_pdin.maxever_time = 0.;
+
+            kernel& k = *kernel::get_instance();    
+
+            // create trigger device for pdin
+            maxever_t_dev = make_shared<trigger>(name, "new_maxever");
+
+            // register services
+            k.add_service(name, "reset_max_ever",
+
+            service_definition_reset_max_ever,
+            std::bind(&jitter_measurement::service_reset_max_ever, this, _1, _2));
+
             // ====> start receiving measurements
             if (threaded)
                 start();
@@ -317,6 +340,7 @@ int jitter_measurement::set_state(module_state_t state) {
 
             if (state == module_state_safeop)
                 break;
+        }
         case safeop_2_op:
             // ====> start sending commands
             k.add_device(pdout_t_dev); 

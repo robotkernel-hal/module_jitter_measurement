@@ -8,9 +8,10 @@ class MainProject(ConanFile):
     description = "robotkernel-5 jitter measurement module."
     settings = "os", "compiler", "build_type", "arch"
     exports_sources = ["*", "!.gitignore"] + ["!%s" % x for x in tools.Git().excluded_files()]
-
     generators = "pkg_config"
-    requires = "robotkernel/[~=5.0]@robotkernel/unstable", "service_provider_process_data_inspection/[~=5.0]@robotkernel/unstable"
+    requires = (
+            "robotkernel/[~=5.0]@robotkernel/stable",
+            "service_provider_process_data_inspection/[~=5.0]@robotkernel/stable" )
 
     def source(self):
         filedata = None
