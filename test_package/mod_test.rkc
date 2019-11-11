@@ -1,0 +1,6 @@
+modules:
+- name: jm 
+  so_file: libmodule_jitter_measurement.so
+  config: { buffer_size: 1000 }
+  power_up: op
+
