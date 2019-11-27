@@ -1,44 +1,13 @@
-from conans import ConanFile, AutoToolsBuildEnvironment, tools
-import re
+from conans import tools, python_requires
 
-class MainProject(ConanFile):
+base = python_requires("conan_template/[~=5]@robotkernel/stable")
+
+class MainProject(base.RobotkernelConanFile):
     name = "module_jitter_measurement"
-    license = "GPLv3"
-    url = f"https://rmc-github.robotic.dlr.de/robotkernel/{name}"
     description = "robotkernel-5 jitter measurement module."
-    settings = "os", "compiler", "build_type", "arch"
     exports_sources = ["*", "!.gitignore"] + ["!%s" % x for x in tools.Git().excluded_files()]
-    generators = "pkg_config"
-    requires = (
-            "robotkernel/[~=5.0]@robotkernel/stable",
-            "service_provider_process_data_inspection/[~=5.0]@robotkernel/stable" )
 
-    def source(self):
-        filedata = None
-        filename = "project.properties"
-        with open(filename, 'r') as f:
-            filedata = f.read()
-        with open(filename, 'w') as f:
-            f.write(re.sub("VERSION *=.*[^\n]", f"VERSION = {self.version}", filedata))
+    def requirements(self):
+        self.requires("robotkernel/[~=5]@robotkernel/stable")
+        self.requires("service_provider_process_data_inspection/[~=5]@robotkernel/stable")
 
-    def build(self):
-        self.run("autoreconf -if")
-        autotools = AutoToolsBuildEnvironment(self)
-        autotools.libs=[]
-        autotools.include_paths=[]
-        autotools.library_paths=[]
-        if self.settings.build_type == "Debug":
-            autotools.flags = ["-O0", "-g"]
-        else:
-            autotools.flags = ["-O3"]
-        autotools.configure(configure_dir=".")
-        autotools.make()
-
-    def package(self):
-        autotools = AutoToolsBuildEnvironment(self)
-        autotools.install()
-
-    def package_info(self):
-        self.cpp_info.includedirs = ['include']
-        self.cpp_info.bindirs = ['bin']
-        self.cpp_info.resdirs = ['share']
