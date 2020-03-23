@@ -214,8 +214,6 @@ int jitter_measurement::set_state(module_state_t state) {
     // get transition
     uint32_t transition = GEN_STATE(this->state, state);
     
-    log(info, "state %s requested\n", state_to_string(state));
-
     switch (transition) {
         case op_2_safeop:
         case op_2_preop:
@@ -356,11 +354,7 @@ int jitter_measurement::set_state(module_state_t state) {
             break;
     }
 
-    this->state = state;
-
-    log(info, "state %s reached\n", state_to_string(state));
-
-    return this->state;
+    return (this->state = state);
 }
         
 //! return input process data (measurements)
