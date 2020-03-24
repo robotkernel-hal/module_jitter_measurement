@@ -242,6 +242,9 @@ int jitter_measurement::set_state(module_state_t state) {
 
             std::unique_lock<std::mutex> lock(devs_mtx);
 
+            // register services
+            k.remove_service(name, "reset_max_ever");
+
             pdin->reset_provider(provider_hash);
             provider_hash = 0;
             pdin = nullptr;
@@ -322,9 +325,8 @@ int jitter_measurement::set_state(module_state_t state) {
 
             // register services
             k.add_service(name, "reset_max_ever",
-
-            service_definition_reset_max_ever,
-            std::bind(&jitter_measurement::service_reset_max_ever, this, _1, _2));
+                    service_definition_reset_max_ever,
+                    std::bind(&jitter_measurement::service_reset_max_ever, this, _1, _2));
 
             // ====> start receiving measurements
             if (threaded)
