@@ -1,29 +1,23 @@
+# -*- encoding: utf-8 mode: python -*-
+
 instance
-name: jitter test
-manager: %(shell hostname):54111
+name: cissy_test
+manager: %(shell hostname):54412
 enable_auto_groups: true
 
-push_name_prefix all
-
-process build
-pass_environment: HOME, PATH
-change_directory: %(CURDIR)
-command: make -f Makefile.suggested ARCH=sled11-x86-gcc4.x install
-flags: start_in_shell
-node: localhost
 
 defines
-rk_base: /volume/software/robotkernel/packages/robotkernel/latest
-rk_config: %(CURDIR)/test.rkc
-rk_arguments: --config %(rk_config)
-rk_debug: true
+CISSYGEN: %(shell echo $CISSYGEN)
 
-pipe_include [ 
-	     %(rk_base)/share/ln/generate_ln_includes 
+include %(CISSYGEN)/nodemap.inc.lnc
+include_glob %(CISSYGEN)/**/*.lnc
 
-	     module_jitter_measurement=%(CURDIR)/build/sled11-x86-gcc4.x/install
-	     
-	     with_gui
+process             robotkernel-5
+use_template:       robotkernel_gen
+command:            robotkernel -c %(CURDIR)/test.rkc
 
-	     %(rk_config)
-]
+process             robotkernel-5 GUI
+use_template:       robotkernel_gen
+change_directory:   %(CURDIR)
+command:            /bin/bash -c robotkernel_gui
+add flags:          start_in_shell, no_error_on_stop, forward_x11

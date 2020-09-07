@@ -1,0 +1,48 @@
+config:
+  generators: ln_env
+  process_manager:
+    start_command: ln_manager -c test.lnc
+    requires_from_all: ".*_msgdef"
+    requires: 
+      - links_and_nodes
+
+nodes:
+  localhost:
+    alias:
+      - guihost
+      - buildhost
+      - rkhost
+    add profiles:
+      - opt-x86_64-gcc-tuned
+
+packages:
+  links_and_nodes:
+    requires:
+      - liblinks_and_nodes/[==1.1.2]@common/unstable
+      - links_and_nodes_manager/[==1.1.2]@common/unstable
+      - links_and_nodes_python/[==1.1.2]@common/unstable
+      - links_and_nodes_runtime/[==1.1.2]@common/unstable
+
+  robotkernel_installer:
+    requires:
+      - robotkernel_installer/master@robotkernel/snapshot
+    options:
+      - robotkernel_installer:allow_unstable=True
+      - robotkernel_installer:rk_version=5
+      - robotkernel_installer:with_gui=True
+      - robotkernel_installer:rk_config=${CISSY_WORKDIR}/test.rkc
+
+processes:
+  robotkernel:
+    requires: robotkernel_installer
+    node: rkhost
+
+  ln_on_guihost:
+    requires:
+      - links_and_nodes
+    node: guihost
+
+  ln_on_rkhost:
+    requires:
+      - links_and_nodes
+    node: rkhost
