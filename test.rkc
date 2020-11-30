@@ -14,5 +14,6 @@ modules:
   config:
     interval: 0.001
     mode: nanosleep
-    power_up: op
-
+    prio: 80
+    affinity: [ 3, ]
+  power_up: op
