@@ -9,19 +9,12 @@ config:
 nodes:
   localhost:
     alias:
-      - guihost
-      - buildhost
       - rkhost
-    add profiles:
-      - opt-x86_64-gcc-tuned
 
 packages:
   links_and_nodes:
     requires:
-      - liblinks_and_nodes/[==1.1.2]@common/unstable
-      - links_and_nodes_manager/[==1.1.2]@common/unstable
-      - links_and_nodes_python/[==1.1.2]@common/unstable
-      - links_and_nodes_runtime/[==1.1.2]@common/unstable
+      - links_and_nodes_manager/[~=1]@common/stable
 
   robotkernel_installer:
     requires:
@@ -35,14 +28,4 @@ packages:
 processes:
   robotkernel:
     requires: robotkernel_installer
-    node: rkhost
-
-  ln_on_guihost:
-    requires:
-      - links_and_nodes
-    node: guihost
-
-  ln_on_rkhost:
-    requires:
-      - links_and_nodes
     node: rkhost
