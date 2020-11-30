@@ -12,12 +12,23 @@ CISSYGEN: %(shell echo $CISSYGEN)
 include %(CISSYGEN)/nodemap.inc.lnc
 include_glob %(CISSYGEN)/**/*.lnc
 
+## templates  ##
+template applyPrioAndAffinity(name, prio, affinity)
+command: PID=`ps -ef | grep "%(name)" | grep -v grep | awk '{ print $2 }'`; for p in $PID; do sudo /usr/bin/chrt -f -p %(prio) $p; done ; for p in $PID; do sudo /usr/bin/taskset -p %(affinity) $p; done
+flags: start_in_shell, no_error_on_successful_stop, no_state_led
+pass_environment: PATH
+
 process             robotkernel-5
 use_template:       robotkernel_gen
 command:            robotkernel -c %(CURDIR)/test.rkc
+start_on_ready: * threads prio + affinity
 
 process             robotkernel-5 GUI
 use_template:       robotkernel_gen
 change_directory:   %(CURDIR)
 command:            /bin/bash -c robotkernel_gui
 add flags:          start_in_shell, no_error_on_stop, forward_x11
+
+process robotkernel threads prio + affinity
+use_template: applyPrioAndAffinity("robotkernel", "90", "2")
+node: rkhost
