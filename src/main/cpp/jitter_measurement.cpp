@@ -94,10 +94,13 @@ void jitter_measurement::tick() {
         buffer_pos = 0;
         buffer_act = (buffer_act + 1) % 2; 
 
-        if (threaded)
+        if (threaded) {
+            std::unique_lock<std::mutex> lock(sync_mtx);
+            do_print = true;
             sync_cond.notify_one();
-        else
+        } else {
             print();
+        }
     }
 }
 
@@ -175,13 +178,16 @@ void jitter_measurement::print() {
 void jitter_measurement::run() {
     std::unique_lock<std::mutex> lock(sync_mtx);
 
-    while (running()) {
-        if (sync_cond.wait_for(lock, std::chrono::seconds(1))
-                == std::cv_status::timeout)
-            continue;
+    log(info, "starting jitter thread\n");
 
-        print();
+    while (running()) {
+        if (sync_cond.wait_for(lock, std::chrono::seconds(1), [&]{return do_print;})) {
+            do_print = false;
+            print();
+        }
     }
+
+    log(info, "stopping jitter thread\n");
 }
 
 //! reset max ever
@@ -329,8 +335,9 @@ int jitter_measurement::set_state(module_state_t state) {
                     std::bind(&jitter_measurement::service_reset_max_ever, this, _1, _2));
 
             // ====> start receiving measurements
-            if (threaded)
+            if (threaded) {
                 start();
+	    }
             
             // add process data inspection and process data
             k.add_device(shared_from_this());   // process data inspection

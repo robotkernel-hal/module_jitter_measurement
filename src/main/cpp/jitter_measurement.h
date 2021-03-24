@@ -65,6 +65,8 @@ class jitter_measurement :
         
         log_tp_t maxever_time;
 
+        bool do_print;
+
         //! print thread sync
         std::mutex              sync_mtx;
         std::condition_variable sync_cond;
