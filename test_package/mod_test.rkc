@@ -1,3 +1,5 @@
+name: test_kernel
+
 modules:
 - name: jm 
   so_file: libmodule_jitter_measurement.so

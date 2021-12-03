@@ -1,13 +1,14 @@
-from conans import tools, python_requires
+from conans import ConanFile, tools
+import os
 
-base = python_requires("conan_template/[~=5]@robotkernel/stable")
+class MainProject(ConanFile):
+    python_requires = "conan_template_ln_generator/[~=5 >=5.0.7]@robotkernel/stable"
+    python_requires_extend = "conan_template_ln_generator.RobotkernelLNGeneratorConanFile"
 
-class MainProject(base.RobotkernelConanFile):
     name = "module_jitter_measurement"
-    description = "robotkernel-5 jitter measurement module."
+    description = "robotkernel jitter measurement module."
     exports_sources = ["*", "!.gitignore"] + ["!%s" % x for x in tools.Git().excluded_files()]
-
-    def requirements(self):
-        self.requires("robotkernel/[~=5]@robotkernel/stable")
-        self.requires("service_provider_process_data_inspection/[~=5]@robotkernel/stable")
+    requires = [    
+        "robotkernel/[~=5]@robotkernel/stable", 
+        "service_provider_process_data_inspection/[~=5]@robotkernel/stable" ]
 
