@@ -57,6 +57,7 @@ jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node)
     buffer_size           = get_as<unsigned int>(node, "buffer_size", 1000);
     buffer_pos            = 0;
     buffer_act            = 0;
+    do_print              = false;
     threaded              = get_as<bool>(node, "threaded", true);
     new_maxever_threshold = get_as<double>(node, "new_maxever_threshold", 0.001);
 
