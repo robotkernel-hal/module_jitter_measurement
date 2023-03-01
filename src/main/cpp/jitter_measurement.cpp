@@ -394,7 +394,7 @@ void jitter_measurement::get_pdin(
         service_provider::process_data_inspection::pd_t& pd) {
 
     pd.resize(pdin->length);
-    pdin->read(consumer_hash, 0, &pd[0], pdin->length, false);
+    memcpy(&pd[0], pdin->peek(), pdin->length);
 }
 
 //! return output process data (commands)
@@ -405,6 +405,6 @@ void jitter_measurement::get_pdout(
         service_provider::process_data_inspection::pd_t& pd) {
 
     pd.resize(pdout->length);
-    pdout->read(consumer_hash, 0, &pd[0], pdout->length, false);
+    memcpy(&pd[0], pdout->peek(), pdout->length);
 }
 
