@@ -32,6 +32,7 @@
 #include <semaphore.h>
 #include <signal.h>
 #include <math.h>
+#include <fcntl.h>
 
 #include "yaml-cpp/yaml.h"
 #include <string_util/string_util.h>
@@ -59,6 +60,9 @@ jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node)
     buffer_act            = 0;
     threaded              = get_as<bool>(node, "threaded", true);
     new_maxever_threshold = get_as<double>(node, "new_maxever_threshold", 0.001);
+    dump_to_file          = get_as<string>(node, "dump_to_file", "");
+
+    dump_fd = 0;
 
     // resize buffers
     buffer[0].resize(buffer_size);
@@ -68,10 +72,16 @@ jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node)
 
 //! default destruction
 jitter_measurement::~jitter_measurement() {
+    if (dump_fd > 0) {
+        close(dump_fd);
+    }
 }
 
 //! additional init function
 void jitter_measurement::init() {
+    if (dump_to_file != "") {
+        dump_fd = open(dump_to_file.c_str(), O_CREAT | O_WRONLY, 0660);
+    }
 }
 
 void jitter_measurement::tick() {
@@ -139,7 +149,17 @@ void jitter_measurement::print() {
         }
         avgjit += (dev * dev);
     }
+
     avgjit = sqrt(avgjit/(buffer_size - 1));
+
+    if (dump_fd > 0) {
+        static char dump_buf[512];
+        for (unsigned i = 0; i < buffer_size; i++) {
+            snprintf(dump_buf, 512, "%llu\t%llu\n", act_buf[i], log_diff[i]);
+            write(dump_fd, dump_buf, strlen(dump_buf));
+            fsync(dump_fd);
+        }
+    }
 
     local_pdin.last_cycle = cycle;
     local_pdin.last_max = maxjit;

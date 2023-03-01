@@ -81,6 +81,8 @@ class jitter_measurement :
 
     public:
         size_t buffer_size;       //! size of jitter measurement buffer
+        std::string dump_to_file;
+        int dump_fd;
         bool threaded;
 
 #define MAXEVER_TIME_STRING_SIZE    128
