@@ -86,13 +86,12 @@ void jitter_measurement::init() {
 }
 
 void jitter_measurement::tick() {
+    if (state < module_state_op) {
+        return;
+    }
+
     // get actual timestamp
     auto now = std::chrono::high_resolution_clock::now();
-
-    std::unique_lock<std::mutex> lock(devs_mtx);
-
-    if (state < module_state_safeop)
-        return;
 
     local_pdin.last_ts = std::chrono::duration_cast<
         std::chrono::nanoseconds>(now.time_since_epoch()).count();
@@ -197,12 +196,15 @@ void jitter_measurement::print() {
 
 //! handler function called if thread is running
 void jitter_measurement::run() {
-    std::unique_lock<std::mutex> lock(sync_mtx);
 
     log(info, "starting jitter thread\n");
 
     while (running()) {
-        if (sync_cond.wait_for(lock, std::chrono::seconds(1), [&]{return do_print;})) {
+        std::unique_lock<std::mutex> lock(sync_mtx);
+        int ret = sync_cond.wait_for(lock, std::chrono::seconds(1), [&]{return do_print;});
+        lock.unlock();
+
+        if (ret) {
             do_print = false;
             print();
         }
@@ -266,8 +268,6 @@ int jitter_measurement::set_state(module_state_t state) {
             k.remove_device(pdin);               // pd inputs
             k.remove_device(pdin_t_dev);         // trigger device pd inputs
             k.remove_device(shared_from_this()); // process data inspection
-
-            std::unique_lock<std::mutex> lock(devs_mtx);
 
             // register services
             k.remove_service(name, "reset_max_ever");
@@ -358,7 +358,7 @@ int jitter_measurement::set_state(module_state_t state) {
             // ====> start receiving measurements
             if (threaded) {
                 start();
-	    }
+	        }
             
             // add process data inspection and process data
             k.add_device(shared_from_this());   // process data inspection

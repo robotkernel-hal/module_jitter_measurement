@@ -71,8 +71,6 @@ class jitter_measurement :
         std::mutex              sync_mtx;
         std::condition_variable sync_cond;
         
-        std::mutex              devs_mtx;
-
         //! print last buffer measurement values
         void print();
 
