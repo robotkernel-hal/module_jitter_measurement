@@ -33,6 +33,7 @@
 #include <signal.h>
 #include <math.h>
 #include <fcntl.h>
+#include <inttypes.h>
 
 #include "yaml-cpp/yaml.h"
 #include <string_util/string_util.h>
@@ -155,7 +156,9 @@ void jitter_measurement::print() {
     if (dump_fd > 0) {
         static char dump_buf[512];
         for (unsigned i = 0; i < buffer_size; i++) {
-            snprintf(dump_buf, 512, "%llu\t%llu\n", act_buf[i], log_diff[i]);
+            uint64_t act_buf_val = chrono::duration_cast<chrono::nanoseconds>(act_buf[i].time_since_epoch()).count();
+            uint64_t log_diff_val = log_diff[i].count();
+            snprintf(dump_buf, 512, "%" PRIu64 "\t%" PRIu64 "\n", act_buf_val, log_diff_val);
             write(dump_fd, dump_buf, strlen(dump_buf));
             fsync(dump_fd);
         }
@@ -171,27 +174,25 @@ void jitter_measurement::print() {
         log(info, "new max ever is %.3fms ago\n", seconds_ago);
 
         std::time_t t = std::chrono::high_resolution_clock::to_time_t(maxever_time);
-        int wr = snprintf(maxever_time_string, MAXEVER_TIME_STRING_SIZE, "%s", std::ctime(&t));
-        maxever_time_string[wr-1] = '\0';
+        maxever_time_string = format_string("%s", std::ctime(&t));
     }
 
     if (local_pdout->max_ever_clamp != 0 && local_pdin.maxever > local_pdout->max_ever_clamp)
         local_pdin.maxever = local_pdout->max_ever_clamp;
 
-    char running_maxever_time_string[MAXEVER_TIME_STRING_SIZE];
+    string running_maxever_time_string;
     auto now = std::chrono::high_resolution_clock::now();
     double seconds_ago = std::chrono::duration<double>(now - maxever_time).count();
 
-    if (maxever_time_string[0] == 0)
-        snprintf(running_maxever_time_string, MAXEVER_TIME_STRING_SIZE, 
-                "(%.1fs ago)", seconds_ago);
-    else
-        snprintf(running_maxever_time_string, MAXEVER_TIME_STRING_SIZE, 
-                "(%s, %.1fs ago)", maxever_time_string, seconds_ago);
+    if (maxever_time_string == "") {
+        running_maxever_time_string = format_string("(%.1fs ago)", seconds_ago);
+    } else {
+        running_maxever_time_string = format_string("(%s, %.1fs ago)", maxever_time_string.c_str(), seconds_ago);
+    }
 
     log(info, "mean period: %4.0fus, jitter mean:"
             " %4.0fus, max %4.0fus, max ever %4.0fus %s\n",
-            cycle*1E6, avgjit*1E6, maxjit*1E6, local_pdin.maxever*1E6, running_maxever_time_string);
+            cycle*1E6, avgjit*1E6, maxjit*1E6, local_pdin.maxever*1E6, running_maxever_time_string.c_str());
 }
 
 //! handler function called if thread is running
