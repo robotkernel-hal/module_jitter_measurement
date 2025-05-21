@@ -104,10 +104,8 @@ class jitter_measurement :
         // named process data
         robotkernel::sp_process_data_t pdin;
         size_t provider_hash;
-        robotkernel::sp_trigger_t pdin_t_dev;
         robotkernel::sp_process_data_t pdout;
         size_t consumer_hash;
-        robotkernel::sp_trigger_t pdout_t_dev;
         robotkernel::sp_trigger_t maxever_t_dev;
 
         //! yaml config construction

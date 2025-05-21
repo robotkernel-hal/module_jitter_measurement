@@ -98,7 +98,7 @@ void jitter_measurement::tick() {
         std::chrono::nanoseconds>(now.time_since_epoch()).count();
 
     pdin->write(provider_hash, 0, (uint8_t *)&local_pdin, sizeof(local_pdin));
-    pdin_t_dev->trigger_modules();
+    pdin->trigger();
 
     buffer[buffer_act][buffer_pos++] = now;
     if (buffer_pos >= buffer_size) {
@@ -251,7 +251,6 @@ int jitter_measurement::set_state(module_state_t state) {
         case op_2_boot:
             // ====> stop sending commands
             k.remove_device(pdout);
-            k.remove_device(pdout_t_dev); 
 
             if (state == module_state_safeop)
                 break;
@@ -267,7 +266,6 @@ int jitter_measurement::set_state(module_state_t state) {
 
             k.remove_device(maxever_t_dev);      // trigger device new maxever
             k.remove_device(pdin);               // pd inputs
-            k.remove_device(pdin_t_dev);         // trigger device pd inputs
             k.remove_device(shared_from_this()); // process data inspection
 
             // register services
@@ -282,8 +280,6 @@ int jitter_measurement::set_state(module_state_t state) {
             pdout = nullptr;
         
             // destroy trigger device
-            pdin_t_dev = nullptr;
-            pdout_t_dev = nullptr;
             maxever_t_dev = nullptr;
 
             this->state = module_state_preop;
@@ -316,28 +312,14 @@ int jitter_measurement::set_state(module_state_t state) {
         case preop_2_op:
         case preop_2_safeop: {
             // create named process data for inputs
-            string pdin_desc = 
-                "- double: max_ever\n"
-                "- double: last_max\n"
-                "- double: last_cycle\n"
-                "- uint64_t: last_ts\n"
-                "- double: max_ever_time\n";
-
-            pdin_t_dev = make_shared<trigger>(name, "inputs");
             pdin = make_shared<robotkernel::triple_buffer>(sizeof(struct jitter_pdin), 
-                    name, string("inputs"), pdin_desc, pdin_t_dev->id());
-
+                    name, string("inputs"), string(
+                        "- double: max_ever\n"
+                        "- double: last_max\n"
+                        "- double: last_cycle\n"
+                        "- uint64_t: last_ts\n"
+                        "- double: max_ever_time\n"));
             provider_hash = pdin->set_provider(shared_from_this());
-
-            // create named process data for outputs 
-            string pdout_desc = 
-                "- double: max_ever_clamp\n";
-
-            pdout_t_dev = make_shared<trigger>(name, "outputs");
-            pdout = make_shared<robotkernel::triple_buffer>(sizeof(struct jitter_pdout), 
-                    name, string("outputs"), pdout_desc, pdout_t_dev->id());
-
-            consumer_hash = pdout->set_consumer(shared_from_this());
 
             maxever_time_string[0] = 0;
             local_pdin.maxever      = 0.;
@@ -362,8 +344,6 @@ int jitter_measurement::set_state(module_state_t state) {
 	        }
             
             // add process data inspection and process data
-            k.add_device(shared_from_this());   // process data inspection
-            k.add_device(pdin_t_dev);           // trigger device pd inputs
             k.add_device(pdin);                 // pd inputs
             k.add_device(maxever_t_dev);        // trigger device new maxever
 
@@ -372,8 +352,13 @@ int jitter_measurement::set_state(module_state_t state) {
         }
         case safeop_2_op:
             // ====> start sending commands
-            k.add_device(pdout_t_dev); 
+            // create named process data for outputs 
+            pdout = make_shared<robotkernel::triple_buffer>(sizeof(struct jitter_pdout), 
+                    name, string("outputs"), string("- double: max_ever_clamp\n"));
+            consumer_hash = pdout->set_consumer(shared_from_this());
+
             k.add_device(pdout);
+            k.add_device(shared_from_this());   // process data inspection
             break;
         case op_2_op:
         case safeop_2_safeop:
