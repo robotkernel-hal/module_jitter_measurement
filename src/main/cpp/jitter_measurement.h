@@ -83,8 +83,7 @@ class jitter_measurement :
         int dump_fd;
         bool threaded;
 
-#define MAXEVER_TIME_STRING_SIZE    128
-        char maxever_time_string[MAXEVER_TIME_STRING_SIZE];
+        std::string maxever_time_string;
 
         double new_maxever_threshold; //!< threshold for trigger on new maxever
 
