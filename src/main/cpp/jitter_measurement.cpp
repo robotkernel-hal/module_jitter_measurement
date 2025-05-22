@@ -174,7 +174,7 @@ void jitter_measurement::print() {
         log(info, "new max ever is %.3fms ago\n", seconds_ago);
 
         std::time_t t = std::chrono::high_resolution_clock::to_time_t(maxever_time);
-        maxever_time_string = format_string("%s", std::ctime(&t));
+        maxever_time_string = format_string("%s", strtok(std::ctime(&t), "\n"));
     }
 
     if (local_pdout->max_ever_clamp != 0 && local_pdin.maxever > local_pdout->max_ever_clamp)
