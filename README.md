@@ -31,17 +31,16 @@ actual measurement.
 - double: max_ever_time
 ```
 
-The process data device is named **`<name>`{=html}.inputs.pd**.
+The process data device is named **`<name>`.inputs.pd**.
 
 # Triggers
 
 This modules provides two trigger devices
 
-`<name>`{=html}.inputs.trigger
+**`<name>`.inputs.trigger**
 :   This is triggered every jitter calculation step
 
-`<name>`{=html}.new_maxever.trigger
+**`<name>`.new_maxever.trigger**
 :   This is triggered if a new maximum jitter value is calculated over
     the whole runtime.
 
-[Jitter measurement](Category:Robotkernel-5 "wikilink")
