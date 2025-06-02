@@ -66,6 +66,7 @@ class jitter_measurement :
         bool do_print;
 
         //! print thread sync
+        std::mutex              state_mtx;
         std::mutex              sync_mtx;
         std::condition_variable sync_cond;
         

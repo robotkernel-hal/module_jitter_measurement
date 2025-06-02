@@ -85,6 +85,8 @@ void jitter_measurement::init() {
 }
 
 void jitter_measurement::tick() {
+    std::unique_lock<std::mutex> lock(state_mtx);
+
     if (state < module_state_op) {
         return;
     }
@@ -242,6 +244,8 @@ int jitter_measurement::set_state(module_state_t state) {
     // get transition
     uint32_t transition = GEN_STATE(this->state, state);
     
+    std::unique_lock<std::mutex> lock(state_mtx);
+
     switch (transition) {
         case op_2_safeop:
         case op_2_preop:
