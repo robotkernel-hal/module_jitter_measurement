@@ -44,8 +44,8 @@ namespace module_jitter_measurement {
 class jitter_measurement :
     public std::enable_shared_from_this<jitter_measurement>,
     public robotkernel::runnable,
-    public robotkernel::module_base,
-    public service_provider::process_data_inspection::base {
+    public robotkernel::module_base
+{
 
     private: 
         //! position in buffer
@@ -102,8 +102,10 @@ class jitter_measurement :
         // named process data
         robotkernel::sp_process_data_t pdin;
         robotkernel::sp_pd_provider_t pdin_provider;
+        service_provider::process_data_inspection::sp_pd_inspection_t pdin_inspect;
         robotkernel::sp_process_data_t pdout;
         robotkernel::sp_pd_consumer_t pdout_consumer;
+        service_provider::process_data_inspection::sp_pd_inspection_t pdout_inspect;
         robotkernel::sp_trigger_t maxever_t_dev;
 
         //! yaml config construction
@@ -142,18 +144,6 @@ class jitter_measurement :
         int service_reset_max_ever(const robotkernel::service_arglist_t& request,
                 robotkernel::service_arglist_t& response);
         static const std::string service_definition_reset_max_ever;
-
-        //! return input process data (measurements)
-        /*!
-         * \param pd return input process data
-         */
-        void get_pdin(service_provider::process_data_inspection::pd_t& pd);
-
-        //! return output process data (commands)
-        /*!
-         * \param pd return output process data
-         */
-        void get_pdout(service_provider::process_data_inspection::pd_t& pd);
 };
 
 #ifdef EMACS

@@ -52,8 +52,7 @@ using namespace string_util;
  * \param node yaml node
  */
 jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node) :
-    runnable(0, 0, name), module_base("module_jitter_measurement", name, node), 
-    service_provider::process_data_inspection::base(name, "jitter") 
+    runnable(0, 0, name), module_base("module_jitter_measurement", name, node)
 {
     buffer_size           = get_as<unsigned int>(node, "buffer_size", 1000);
     buffer_pos            = 0;
@@ -249,7 +248,13 @@ int jitter_measurement::set_state(module_state_t state) {
         case op_2_init:
         case op_2_boot:
             // ====> stop sending commands
+            k.remove_device(pdout_inspect);
+            pdout_inspect = nullptr;
+
             k.remove_device(pdout);
+            pdout->reset_consumer(pdout_consumer);
+            pdout_consumer = nullptr;
+            pdout = nullptr;
 
             if (state == module_state_safeop)
                 break;
@@ -264,8 +269,11 @@ int jitter_measurement::set_state(module_state_t state) {
             } while (running());
 
             k.remove_device(maxever_t_dev);      // trigger device new maxever
+                                                 
+            k.remove_device(pdin_inspect);
+            pdin_inspect = nullptr;
+
             k.remove_device(pdin);               // pd inputs
-            k.remove_device(shared_from_this()); // process data inspection
 
             // register services
             k.remove_service(name, "reset_max_ever");
@@ -274,10 +282,6 @@ int jitter_measurement::set_state(module_state_t state) {
             pdin_provider = nullptr;
             pdin = nullptr;
 
-            pdout->reset_consumer(pdout_consumer);
-            pdout_consumer = nullptr;
-            pdout = nullptr;
-        
             // destroy trigger device
             maxever_t_dev = nullptr;
 
@@ -346,6 +350,9 @@ int jitter_measurement::set_state(module_state_t state) {
             // add process data inspection and process data
             k.add_device(pdin);                 // pd inputs
             k.add_device(maxever_t_dev);        // trigger device new maxever
+                                                
+            pdin_inspect = make_shared<service_provider::process_data_inspection::pd_inspection>(name, "inputs", pdin);
+            k.add_device(pdin_inspect);
 
             if (state == module_state_safeop)
                 break;
@@ -357,9 +364,11 @@ int jitter_measurement::set_state(module_state_t state) {
                     name, string("outputs"), string("- double: max_ever_clamp\n"));
             pdout_consumer = make_shared<pd_consumer>(name);
             pdout->set_consumer(pdout_consumer);
-
             k.add_device(pdout);
-            k.add_device(shared_from_this());   // process data inspection
+            
+            pdout_inspect = make_shared<service_provider::process_data_inspection::pd_inspection>(name, "outputs", pdout);
+            k.add_device(pdout_inspect);
+
             break;
         case op_2_op:
         case safeop_2_safeop:
@@ -374,25 +383,3 @@ int jitter_measurement::set_state(module_state_t state) {
     return (this->state = state);
 }
         
-//! return input process data (measurements)
-/*!
- * \param pd return input process data
- */
-void jitter_measurement::get_pdin(
-        service_provider::process_data_inspection::pd_t& pd) {
-
-    pd.resize(pdin->length);
-    memcpy(&pd[0], pdin->peek(), pdin->length);
-}
-
-//! return output process data (commands)
-/*!
- * \param pd return output process data
- */
-void jitter_measurement::get_pdout(
-        service_provider::process_data_inspection::pd_t& pd) {
-
-    pd.resize(pdout->length);
-    memcpy(&pd[0], pdout->peek(), pdout->length);
-}
-
