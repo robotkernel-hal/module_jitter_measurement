@@ -8,4 +8,4 @@ class MainProject(ConanFile):
     name = "module_jitter_measurement"
     description = "robotkernel jitter measurement module."
     exports_sources = ["*", "!.gitignore"]
-    requires = ["robotkernel/[~6]@robotkernel/snapshot", "service_provider_process_data_inspection/[~6]@robotkernel/snapshot"]
+    requires = ["robotkernel/[~6]@robotkernel/unstable", "service_provider_process_data_inspection/[~6]@robotkernel/unstable"]
