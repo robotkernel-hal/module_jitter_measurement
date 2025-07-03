@@ -146,7 +146,7 @@ void jitter_measurement::print() {
             have_new_maxever = true;
         
             if (local_pdin.maxever > new_maxever_threshold)
-                maxever_t_dev->trigger_modules();
+                maxever_t_dev->do_trigger();
         }
         avgjit += (dev * dev);
     }
@@ -237,153 +237,98 @@ int jitter_measurement::service_reset_max_ever(
 const std::string jitter_measurement::service_definition_reset_max_ever = 
 "response:\n"
 "- double: maxever\n";
+        
+//! State transition from PREOP to SAFEOP
+void jitter_measurement::set_state_op_2_safeop() {
+    // ====> stop sending commands
+    robotkernel::remove_device(pdout_inspect);
+    pdout_inspect = nullptr;
 
-int jitter_measurement::set_state(module_state_t state) {
-    kernel& k = *kernel::get_instance();
+    robotkernel::remove_device(pdout);
+    pdout->reset_consumer(pdout_consumer);
+    pdout_consumer = nullptr;
+    pdout = nullptr;
+}
 
-    // get transition
-    uint32_t transition = GEN_STATE(this->state, state);
-    
-    std::unique_lock<std::mutex> lock(state_mtx);
+//! State transition from PREOP to SAFEOP
+void jitter_measurement::set_state_safeop_2_preop() {
+    // ====> stop receiving measurements
+    stop();
 
-    switch (transition) {
-        case op_2_safeop:
-        case op_2_preop:
-        case op_2_init:
-        case op_2_boot:
-            // ====> stop sending commands
-            k.remove_device(pdout_inspect);
-            pdout_inspect = nullptr;
+    do {
+        // wait until thread has stopped
+    } while (running());
 
-            k.remove_device(pdout);
-            pdout->reset_consumer(pdout_consumer);
-            pdout_consumer = nullptr;
-            pdout = nullptr;
+    robotkernel::remove_device(maxever_t_dev);      // trigger device new maxever
 
-            if (state == module_state_safeop)
-                break;
-        case safeop_2_preop:
-        case safeop_2_init:
-        case safeop_2_boot: {
-            // ====> stop receiving measurements
-            stop();
+    robotkernel::remove_device(pdin_inspect);
+    pdin_inspect = nullptr;
 
-            do {
-                // wait until thread has stopped
-            } while (running());
+    robotkernel::remove_device(pdin);               // pd inputs
 
-            k.remove_device(maxever_t_dev);      // trigger device new maxever
-                                                 
-            k.remove_device(pdin_inspect);
-            pdin_inspect = nullptr;
+    // register services
+    robotkernel::remove_service(name, "reset_max_ever");
 
-            k.remove_device(pdin);               // pd inputs
+    pdin->reset_provider(pdin_provider);
+    pdin_provider = nullptr;
+    pdin = nullptr;
 
-            // register services
-            k.remove_service(name, "reset_max_ever");
+    // destroy trigger device
+    maxever_t_dev = nullptr;
+}
 
-            pdin->reset_provider(pdin_provider);
-            pdin_provider = nullptr;
-            pdin = nullptr;
+//! State transition from PREOP to SAFEOP
+void jitter_measurement::set_state_preop_2_safeop() {
+    // create named process data for inputs
+    pdin = make_shared<robotkernel::triple_buffer>(sizeof(struct jitter_pdin), 
+            name, string("inputs"), string(
+                "- double: max_ever\n"
+                "- double: last_max\n"
+                "- double: last_cycle\n"
+                "- uint64_t: last_ts\n"
+                "- double: max_ever_time\n"));
+    pdin_provider = make_shared<pd_provider>(name);
+    pdin->set_provider(pdin_provider);
 
-            // destroy trigger device
-            maxever_t_dev = nullptr;
+    maxever_time_string[0] = 0;
+    local_pdin.maxever      = 0.;
+    local_pdin.last_max     = 0.;
+    local_pdin.last_cycle   = 0.;
+    local_pdin.last_ts      = 0;
+    local_pdin.maxever_time = 0.;
 
-            this->state = module_state_preop;
+    // create trigger device for pdin
+    maxever_t_dev = make_shared<trigger>(name, "new_maxever");
 
-            if (state == module_state_preop)
-                break;
-        }
-        case preop_2_init:
-        case preop_2_boot:
-            // ====> deinit devices
-        case init_2_init:
-            // ====> re-/open device
-            if (state == module_state_init)
-                break;
-        case init_2_boot:
-            break;
-        case boot_2_init:
-        case boot_2_preop:
-        case boot_2_safeop:
-        case boot_2_op:
-            // ====> re-/open device
-            if (state == module_state_init)
-                break;
-        case init_2_op:
-        case init_2_safeop:
-        case init_2_preop:
-            // ====> initial devices            
-            if (state == module_state_preop)
-                break;
-        case preop_2_op:
-        case preop_2_safeop: {
-            // create named process data for inputs
-            pdin = make_shared<robotkernel::triple_buffer>(sizeof(struct jitter_pdin), 
-                    name, string("inputs"), string(
-                        "- double: max_ever\n"
-                        "- double: last_max\n"
-                        "- double: last_cycle\n"
-                        "- uint64_t: last_ts\n"
-                        "- double: max_ever_time\n"));
-            pdin_provider = make_shared<pd_provider>(name);
-            pdin->set_provider(pdin_provider);
+    // register services
+    robotkernel::add_service(name, "reset_max_ever",
+            service_definition_reset_max_ever,
+            std::bind(&jitter_measurement::service_reset_max_ever, this, _1, _2));
 
-            maxever_time_string[0] = 0;
-            local_pdin.maxever      = 0.;
-            local_pdin.last_max     = 0.;
-            local_pdin.last_cycle   = 0.;
-            local_pdin.last_ts      = 0;
-            local_pdin.maxever_time = 0.;
-
-            kernel& k = *kernel::get_instance();    
-
-            // create trigger device for pdin
-            maxever_t_dev = make_shared<trigger>(name, "new_maxever");
-
-            // register services
-            k.add_service(name, "reset_max_ever",
-                    service_definition_reset_max_ever,
-                    std::bind(&jitter_measurement::service_reset_max_ever, this, _1, _2));
-
-            // ====> start receiving measurements
-            if (threaded) {
-                start();
-	        }
-            
-            // add process data inspection and process data
-            k.add_device(pdin);                 // pd inputs
-            k.add_device(maxever_t_dev);        // trigger device new maxever
-                                                
-            pdin_inspect = make_shared<service_provider::process_data_inspection::pd_inspection>(name, "inputs", pdin);
-            k.add_device(pdin_inspect);
-
-            if (state == module_state_safeop)
-                break;
-        }
-        case safeop_2_op:
-            // ====> start sending commands
-            // create named process data for outputs 
-            pdout = make_shared<robotkernel::triple_buffer>(sizeof(struct jitter_pdout), 
-                    name, string("outputs"), string("- double: max_ever_clamp\n"));
-            pdout_consumer = make_shared<pd_consumer>(name);
-            pdout->set_consumer(pdout_consumer);
-            k.add_device(pdout);
-            
-            pdout_inspect = make_shared<service_provider::process_data_inspection::pd_inspection>(name, "outputs", pdout);
-            k.add_device(pdout_inspect);
-
-            break;
-        case op_2_op:
-        case safeop_2_safeop:
-        case preop_2_preop:
-            // ====> do nothing
-            break;
-
-        default:
-            break;
+    // ====> start receiving measurements
+    if (threaded) {
+        start();
     }
 
-    return (this->state = state);
+    // add process data inspection and process data
+    robotkernel::add_device(pdin);                 // pd inputs
+    robotkernel::add_device(maxever_t_dev);        // trigger device new maxever
+
+    pdin_inspect = make_shared<service_provider::process_data_inspection::pd_inspection>(name, "inputs", pdin);
+    robotkernel::add_device(pdin_inspect);
 }
-        
+
+//! State transition from PREOP to SAFEOP
+void jitter_measurement::set_state_safeop_2_op() {
+    // ====> start sending commands
+    // create named process data for outputs 
+    pdout = make_shared<robotkernel::triple_buffer>(sizeof(struct jitter_pdout), 
+            name, string("outputs"), string("- double: max_ever_clamp\n"));
+    pdout_consumer = make_shared<pd_consumer>(name);
+    pdout->set_consumer(pdout_consumer);
+    robotkernel::add_device(pdout);
+
+    pdout_inspect = make_shared<service_provider::process_data_inspection::pd_inspection>(name, "outputs", pdout);
+    robotkernel::add_device(pdout_inspect);
+}
+

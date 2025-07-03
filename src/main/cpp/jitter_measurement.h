@@ -25,6 +25,7 @@
 
 #include "robotkernel/runnable.h"
 #include "robotkernel/module_base.h"
+#include "robotkernel/process_data/triple_buffer.h"
 
 #include "service_provider/process_data_inspection/base.h"
 
@@ -66,7 +67,6 @@ class jitter_measurement :
         bool do_print;
 
         //! print thread sync
-        std::mutex              state_mtx;
         std::mutex              sync_mtx;
         std::condition_variable sync_cond;
         
@@ -120,21 +120,26 @@ class jitter_measurement :
         ~jitter_measurement();
 
         //! additional init function
-        void init();
+        virtual void init() override;
 
-        //! set module state
-        /*
-         * \param state module state to set
-         * \return 0 on success
-         */
-        int set_state(module_state_t state);
+        //! State transition from PREOP to SAFEOP
+        virtual void set_state_op_2_safeop() override;
+
+        //! State transition from PREOP to SAFEOP
+        virtual void set_state_safeop_2_preop() override;
+    
+        //! State transition from PREOP to SAFEOP
+        virtual void set_state_preop_2_safeop() override;
+
+        //! State transition from PREOP to SAFEOP
+        virtual void set_state_safeop_2_op() override;
 
         //! module trigger callback
         /*! does one measurement
          *
          * if log buffer is full, output thread is triggered
          */
-        void tick();
+        virtual void tick() override;
 
         //! reset max ever
         /*!
