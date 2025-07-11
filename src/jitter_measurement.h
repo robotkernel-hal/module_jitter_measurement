@@ -4,24 +4,25 @@
  */
 
 /*
- * This file is part of robotkernel.
+ * This file is part of module_jitter_measurement.
  *
- * robotkernel is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * robotkernel is distributed in the hope that it will be useful,
+ * module_jitter_measurement is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 3 of the License, or (at your option) any later version.
+ * 
+ * module_jitter_measurement is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with robotkernel.  If not, see <http://www.gnu.org/licenses/>.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with module_jitter_measurement; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-#ifndef __MODULE_JITTER_MEASSUREMENT_H__
-#define __MODULE_JITTER_MEASSUREMENT_H__
+#ifndef MODULE_JITTER_MEASSUREMENT__JITTER_MEASUREMENT_H
+#define MODULE_JITTER_MEASSUREMENT__JITTER_MEASUREMENT_H
 
 #include "robotkernel/runnable.h"
 #include "robotkernel/module_base.h"
@@ -40,9 +41,6 @@
 #include "config.h"
 
 namespace module_jitter_measurement {
-#ifdef EMACS
-}
-#endif
 
 class jitter_measurement :
     public std::enable_shared_from_this<jitter_measurement>,
@@ -154,10 +152,7 @@ class jitter_measurement :
             struct svc_resp_reset_max_ever& resp) override;
 };
 
-#ifdef EMACS
-{
-#endif
-};
+}; // namespace module_jitter_measurement
 
-#endif // __MODULE_JITTER_MEASSUREMENT_H__
+#endif // MODULE_JITTER_MEASSUREMENT__JITTER_MEASUREMENT_H
 
