@@ -26,7 +26,10 @@
 #include "robotkernel/runnable.h"
 #include "robotkernel/module_base.h"
 
-#include "service_provider/process_data_inspection/base.h"
+#include "service_provider_process_data_inspection/base.h"
+
+// include generate service definition header
+#include "service_definitions.h"
 
 #include "yaml-cpp/yaml.h"
 
@@ -44,7 +47,8 @@ namespace module_jitter_measurement {
 class jitter_measurement :
     public std::enable_shared_from_this<jitter_measurement>,
     public robotkernel::runnable,
-    public robotkernel::module_base
+    public robotkernel::module_base,
+    public svc_base_reset_max_ever 
 {
 
     private: 
@@ -102,10 +106,10 @@ class jitter_measurement :
         // named process data
         robotkernel::sp_process_data_t pdin;
         robotkernel::sp_pd_provider_t pdin_provider;
-        service_provider::process_data_inspection::sp_pd_inspection_t pdin_inspect;
+        service_provider_process_data_inspection::sp_pd_inspection_t pdin_inspect;
         robotkernel::sp_process_data_t pdout;
         robotkernel::sp_pd_consumer_t pdout_consumer;
-        service_provider::process_data_inspection::sp_pd_inspection_t pdout_inspect;
+        service_provider_process_data_inspection::sp_pd_inspection_t pdout_inspect;
         robotkernel::sp_trigger_t maxever_t_dev;
 
         //! yaml config construction
@@ -140,15 +144,14 @@ class jitter_measurement :
          */
         virtual void tick() override;
 
-        //! reset max ever
+        //! svc_reset_max_ever
         /*!
-         * \param request service request data
-         * \param response service response data
-         * \return success
+         * \param[in]   req     Service request data.
+         * \param[out]  resp    Service response data.
          */
-        int service_reset_max_ever(const robotkernel::service_arglist_t& request,
-                robotkernel::service_arglist_t& response);
-        static const std::string service_definition_reset_max_ever;
+        virtual void svc_reset_max_ever(
+            const struct svc_req_reset_max_ever& req, 
+            struct svc_resp_reset_max_ever& resp) override;
 };
 
 #ifdef EMACS

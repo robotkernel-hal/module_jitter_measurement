@@ -34,7 +34,7 @@ AC_TYPE_SIZE_T
 # Checks for library functions.
 AC_CHECK_LIB(dl, dlopen)
 
-AC_CONFIG_FILES([Makefile src/main/cpp/Makefile module_jitter_measurement.pc])
+AC_CONFIG_FILES([Makefile src/Makefile module_jitter_measurement.pc])
 
 AC_OUTPUT
 

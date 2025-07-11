@@ -36,15 +36,12 @@
 #include <inttypes.h>
 
 #include "yaml-cpp/yaml.h"
-#include <string_util/string_util.h>
 
 MODULE_DEF(module_jitter_measurement, module_jitter_measurement::jitter_measurement)
 
 using namespace std;
-using namespace std::placeholders;
 using namespace robotkernel;
 using namespace module_jitter_measurement;
-using namespace string_util;
         
 //! yaml config construction
 /*!
@@ -174,7 +171,7 @@ void jitter_measurement::print() {
         log(info, "new max ever is %.3fms ago\n", seconds_ago);
 
         std::time_t t = std::chrono::high_resolution_clock::to_time_t(maxever_time);
-        maxever_time_string = format_string("%s", strtok(std::ctime(&t), "\n"));
+        maxever_time_string = string_printf("%s", strtok(std::ctime(&t), "\n"));
     }
 
     if (local_pdout->max_ever_clamp != 0 && local_pdin.maxever > local_pdout->max_ever_clamp)
@@ -185,9 +182,9 @@ void jitter_measurement::print() {
     double seconds_ago = std::chrono::duration<double>(now - maxever_time).count();
 
     if (maxever_time_string == "") {
-        running_maxever_time_string = format_string("(%.1fs ago)", seconds_ago);
+        running_maxever_time_string = string_printf("(%.1fs ago)", seconds_ago);
     } else {
-        running_maxever_time_string = format_string("(%s, %.1fs ago)", maxever_time_string.c_str(), seconds_ago);
+        running_maxever_time_string = string_printf("(%s, %.1fs ago)", maxever_time_string.c_str(), seconds_ago);
     }
 
     log(info, "mean period: %4.0fus, jitter mean:"
@@ -214,30 +211,21 @@ void jitter_measurement::run() {
     log(info, "stopping jitter thread\n");
 }
 
-//! reset max ever
+//! svc_reset_max_ever
 /*!
- * \param request service request data
- * \param response service response data
- * \return success
+ * \param[in]   req     Service request data.
+ * \param[out]  resp    Service response data.
  */
-int jitter_measurement::service_reset_max_ever(
-        const robotkernel::service_arglist_t& request,
-        robotkernel::service_arglist_t& response) {
-#define RESET_MAX_EVER_RESP_MAXEVER 0
-    response.resize(1);
-    response[RESET_MAX_EVER_RESP_MAXEVER] = local_pdin.maxever;
-
+void jitter_measurement::svc_reset_max_ever(
+        const struct svc_req_reset_max_ever& req, 
+        struct svc_resp_reset_max_ever& resp) 
+{
+    resp.maxever = local_pdin.maxever;
     local_pdin.maxever = 0;
     local_pdin.maxever_time = 0;
     maxever_time_string[0] = 0;
-
-    return 0;
 }
 
-const std::string jitter_measurement::service_definition_reset_max_ever = 
-"response:\n"
-"- double: maxever\n";
-        
 //! State transition from PREOP to SAFEOP
 void jitter_measurement::set_state_op_2_safeop() {
     // ====> stop sending commands
@@ -267,7 +255,7 @@ void jitter_measurement::set_state_safeop_2_preop() {
     robotkernel::remove_device(pdin);               // pd inputs
 
     // register services
-    robotkernel::remove_service(name, "reset_max_ever");
+    remove_svc_reset_max_ever();
 
     pdin->reset_provider(pdin_provider);
     pdin_provider = nullptr;
@@ -301,9 +289,7 @@ void jitter_measurement::set_state_preop_2_safeop() {
     maxever_t_dev = make_shared<trigger>(name, "new_maxever");
 
     // register services
-    robotkernel::add_service(name, "reset_max_ever",
-            service_definition_reset_max_ever,
-            std::bind(&jitter_measurement::service_reset_max_ever, this, _1, _2));
+    add_svc_reset_max_ever(name, "reset_max_ever");
 
     // ====> start receiving measurements
     if (threaded) {
@@ -314,7 +300,7 @@ void jitter_measurement::set_state_preop_2_safeop() {
     robotkernel::add_device(pdin);                 // pd inputs
     robotkernel::add_device(maxever_t_dev);        // trigger device new maxever
 
-    pdin_inspect = make_shared<service_provider::process_data_inspection::pd_inspection>(name, "inputs", pdin);
+    pdin_inspect = make_shared<service_provider_process_data_inspection::pd_inspection>(name, "inputs", pdin);
     robotkernel::add_device(pdin_inspect);
 }
 
@@ -328,7 +314,7 @@ void jitter_measurement::set_state_safeop_2_op() {
     pdout->set_consumer(pdout_consumer);
     robotkernel::add_device(pdout);
 
-    pdout_inspect = make_shared<service_provider::process_data_inspection::pd_inspection>(name, "outputs", pdout);
+    pdout_inspect = make_shared<service_provider_process_data_inspection::pd_inspection>(name, "outputs", pdout);
     robotkernel::add_device(pdout_inspect);
 }
 
