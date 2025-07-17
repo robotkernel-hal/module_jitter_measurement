@@ -5,13 +5,13 @@ Maintainer: Robert Burger <robert.burger@dlr.de>
 Build-Depends: debhelper-compat (= 13), robotkernel-dev (>=6), service-provider-process-data-inspection-dev (>=6)
 Standards-Version: 4.5.1
 Homepage: <insert the upstream URL, if relevant>
-#Vcs-Browser: https://salsa.debian.org/debian/robotkernel-module-jitter-measurement
-#Vcs-Git: https://salsa.debian.org/debian/robotkernel-module-jitter-measurement.git
+Vcs-Browser: https://github.com/robotkernel-hal/module_jitter_measurement.git
+Vcs-Git: https://github.com/robotkernel-hal/module_jitter_measurement.git
 Rules-Requires-Root: no
 
 Package: module-jitter-measurement
 Architecture: any
 Multi-Arch: same
 Depends: robotkernel ${misc:Depends}
-Description: <insert up to 60 chars description>
+Description: Robotkernel module to do jitter measurement of trigger pulses. 
  <insert long description, indented with spaces>
