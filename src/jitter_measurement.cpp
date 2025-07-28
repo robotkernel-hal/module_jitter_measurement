@@ -59,6 +59,7 @@ jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node)
     threaded              = get_as<bool>(node, "threaded", true);
     new_maxever_threshold = get_as<double>(node, "new_maxever_threshold", 0.001);
     dump_to_file          = get_as<string>(node, "dump_to_file", "");
+    trigger_dev_name      = get_as<string>(node, "trigger_dev");
 
     dump_fd = 0;
 
@@ -209,7 +210,7 @@ void jitter_measurement::run() {
         }
     }
 
-    log(info, "stopping jitter thread\n");
+    log(info, "stopped jitter thread\n");
 }
 
 //! svc_reset_max_ever
@@ -247,6 +248,9 @@ void jitter_measurement::set_state_safeop_2_preop() {
     do {
         // wait until thread has stopped
     } while (running());
+
+    trigger_dev->remove_trigger(shared_from_this());
+    trigger_dev = nullptr;
 
     robotkernel::remove_device(maxever_t_dev);      // trigger device new maxever
 
@@ -303,6 +307,9 @@ void jitter_measurement::set_state_preop_2_safeop() {
 
     pdin_inspect = make_shared<service_provider_process_data_inspection::pd_inspection>(name, "inputs", pdin);
     robotkernel::add_device(pdin_inspect);
+
+    trigger_dev = robotkernel::get_device<trigger>(trigger_dev_name);
+    trigger_dev->add_trigger(shared_from_this());
 }
 
 //! State transition from PREOP to SAFEOP

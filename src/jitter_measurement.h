@@ -26,6 +26,7 @@
 
 #include "robotkernel/runnable.h"
 #include "robotkernel/module_base.h"
+#include "robotkernel/trigger_base.h"
 
 #include "service_provider_process_data_inspection/base.h"
 
@@ -46,6 +47,7 @@ class jitter_measurement :
     public std::enable_shared_from_this<jitter_measurement>,
     public robotkernel::runnable,
     public robotkernel::module_base,
+    public robotkernel::trigger_base,
     public svc_base_reset_max_ever 
 {
 
@@ -82,6 +84,8 @@ class jitter_measurement :
         std::string dump_to_file;
         int dump_fd;
         bool threaded;
+        std::string trigger_dev_name;
+        robotkernel::sp_trigger_t trigger_dev;
 
         std::string maxever_time_string;
 
