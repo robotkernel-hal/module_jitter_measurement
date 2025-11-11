@@ -93,7 +93,6 @@ void jitter_measurement::tick() {
         std::chrono::nanoseconds>(now.time_since_epoch()).count();
 
     pdin->write(pdin_provider, 0, (uint8_t *)&local_pdin, sizeof(local_pdin));
-    pdin->trigger();
 
     buffer[buffer_act][buffer_pos++] = now;
     if (buffer_pos >= buffer_size) {
