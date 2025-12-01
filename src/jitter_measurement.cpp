@@ -59,9 +59,10 @@ jitter_measurement::jitter_measurement(const char* name, const YAML::Node& node)
     threaded              = get_as<bool>(node, "threaded", true);
     new_maxever_threshold = get_as<double>(node, "new_maxever_threshold", 0.001);
     dump_to_file          = get_as<string>(node, "dump_to_file", "");
-    trigger_dev_name      = get_as<string>(node, "trigger_dev");
 
     dump_fd = 0;
+
+    trg = make_shared<triggerable>(node["trigger"], std::bind(&jitter_measurement::tick, this));
 
     // resize buffers
     buffer[0].resize(buffer_size);
@@ -226,8 +227,7 @@ void jitter_measurement::svc_reset_max_ever(
 //! State transition from PREOP to SAFEOP
 void jitter_measurement::set_state_op_2_safeop() {
     // ====> stop sending commands
-    trigger_dev->remove_trigger(shared_from_this());
-    trigger_dev = nullptr;
+    trg->release();
 
     robotkernel::remove_device(pdout_inspect);
     robotkernel::remove_device(pdout);
@@ -317,7 +317,6 @@ void jitter_measurement::set_state_safeop_2_op() {
     robotkernel::add_device(pdout);
     robotkernel::add_device(pdout_inspect);
 
-    trigger_dev = robotkernel::get_device<trigger>(trigger_dev_name);
-    trigger_dev->add_trigger(shared_from_this());
+    trg->aquire();
 }
 

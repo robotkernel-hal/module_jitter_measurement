@@ -47,7 +47,6 @@ class jitter_measurement :
     public std::enable_shared_from_this<jitter_measurement>,
     public robotkernel::runnable,
     public robotkernel::module_base,
-    public robotkernel::trigger_base,
     public svc_base_reset_max_ever 
 {
 
@@ -84,10 +83,8 @@ class jitter_measurement :
         std::string dump_to_file;
         int dump_fd;
         bool threaded;
-        std::string trigger_dev_name;
-        robotkernel::sp_trigger_t trigger_dev;
-
         std::string maxever_time_string;
+        std::shared_ptr<robotkernel::triggerable> trg;
 
         double new_maxever_threshold; //!< threshold for trigger on new maxever
 
@@ -144,7 +141,7 @@ class jitter_measurement :
          *
          * if log buffer is full, output thread is triggered
          */
-        virtual void tick() override;
+        void tick();
 
         //! svc_reset_max_ever
         /*!

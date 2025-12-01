@@ -10,7 +10,7 @@ modules:
 
 - name: jm 
   so_file: libmodule_jitter_measurement.so
-  config: { trigger_dev: timer.main.trigger, buffer_size: 1000 }
+  config: { trigger: { dev_name: timer.main.trigger }, buffer_size: 1000 }
   depends: [ timer, ]
   power_up: op
 
