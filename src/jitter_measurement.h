@@ -27,6 +27,7 @@
 #include "robotkernel/runnable.h"
 #include "robotkernel/module_base.h"
 #include "robotkernel/trigger_base.h"
+#include "robotkernel/helpers.h"
 
 #include "service_provider_process_data_inspection/base.h"
 
@@ -44,7 +45,6 @@
 namespace module_jitter_measurement {
 
 class jitter_measurement :
-    public std::enable_shared_from_this<jitter_measurement>,
     public robotkernel::runnable,
     public robotkernel::module_base,
     public svc_base_reset_max_ever 
