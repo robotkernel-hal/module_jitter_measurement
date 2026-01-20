@@ -42,6 +42,7 @@ MODULE_DEF(module_jitter_measurement, module_jitter_measurement::jitter_measurem
 
 using namespace std;
 using namespace robotkernel;
+using namespace robotkernel::helpers;
 using namespace module_jitter_measurement;
         
 //! yaml config construction
