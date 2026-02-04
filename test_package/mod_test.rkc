@@ -5,7 +5,7 @@ modules:
   so_file: libmodule_posix_timer.so
   config: 
     timers:
-    - { name: main, interval: 0.001, skip_missed: true, mode: nanosleep, prio: 80, affinity: [ 1 ] }
+    - { name: main, interval: 0.001, skip_missed: true, mode: nanosleep, prio: 0, affinity: [ 1 ] }
   power_up: op
 
 - name: jm 
