@@ -1,4 +1,5 @@
-name: module_jitter_measurement/reset_max_ever
-response:
-- double: maxever
+services:
+  - name: module_jitter_measurement/reset_max_ever
+    response:
+      - { name: maxever, type: double }
 
