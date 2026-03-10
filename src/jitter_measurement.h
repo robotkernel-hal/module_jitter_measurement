@@ -32,7 +32,7 @@
 #include "service_provider_process_data_inspection/base.h"
 
 // include generate service definition header
-#include "service_definitions.h"
+#include "gen_definitions.h"
 
 #include "yaml-cpp/yaml.h"
 

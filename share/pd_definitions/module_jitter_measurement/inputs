@@ -1,0 +1,7 @@
+pds:
+  module_jitter_measurement/inputs:
+    maxever: { type: double }
+    last_max: { type: double }
+    last_cycle: { type: double }
+    last_ts: { type: uint64_t }
+    maxever_time: { type: double }
