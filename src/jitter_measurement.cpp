@@ -118,7 +118,7 @@ void jitter_measurement::print() {
     double dev;
     double cycle = 0, avgjit = 0, maxjit = 0;
     
-    struct jitter_pdout *local_pdout = (struct jitter_pdout *)pdout->pop(pdout_consumer);
+    auto *local_pdout = (pd_outputs::data *)pdout->pop(pdout_consumer);
 
     // calculate differences and sum of differences
     for (unsigned i = 0; i < buffer_size - 1; ++i) {
@@ -173,8 +173,8 @@ void jitter_measurement::print() {
         maxever_time_string = string_printf("%s", strtok(std::ctime(&t), "\n"));
     }
 
-    if (local_pdout->max_ever_clamp != 0 && local_pdin.maxever > local_pdout->max_ever_clamp)
-        local_pdin.maxever = local_pdout->max_ever_clamp;
+    if (local_pdout->maxever_clamp != 0 && local_pdin.maxever > local_pdout->maxever_clamp)
+        local_pdin.maxever = local_pdout->maxever_clamp;
 
     string running_maxever_time_string;
     auto now = std::chrono::high_resolution_clock::now();
@@ -254,6 +254,7 @@ void jitter_measurement::set_state_safeop_2_preop() {
     pdin_inspect = nullptr;
 
     robotkernel::remove_device(pdin);               // pd inputs
+    pd_inputs::remove_definition();
 
     // register services
     remove_svc_reset_max_ever();
@@ -269,13 +270,9 @@ void jitter_measurement::set_state_safeop_2_preop() {
 //! State transition from PREOP to SAFEOP
 void jitter_measurement::set_state_preop_2_safeop() {
     // create named process data for inputs
-    pdin = make_shared<robotkernel::triple_buffer>(sizeof(struct jitter_pdin), 
-            name, string("inputs"), string(
-                "- double: max_ever\n"
-                "- double: last_max\n"
-                "- double: last_cycle\n"
-                "- uint64_t: last_ts\n"
-                "- double: max_ever_time\n"));
+    pd_inputs::register_definition();
+    pdin = make_shared<robotkernel::triple_buffer>(pd_inputs::size,
+            name, string("inputs"), pd_inputs::definition_name);
     pdin_provider = make_shared<pd_provider>(name);
     pdin->set_provider(pdin_provider);
 
@@ -305,8 +302,9 @@ void jitter_measurement::set_state_preop_2_safeop() {
     robotkernel::add_device(pdin_inspect);
     
     // create named process data for outputs 
-    pdout = make_shared<robotkernel::triple_buffer>(sizeof(struct jitter_pdout), 
-            name, string("outputs"), string("- double: max_ever_clamp\n"));
+    pd_outputs::register_definition();
+    pdout = make_shared<robotkernel::triple_buffer>(pd_outputs::size,
+            name, string("outputs"), pd_outputs::definition_name);
     pdout_consumer = make_shared<pd_consumer>(name);
     pdout->set_consumer(pdout_consumer);
     pdout_inspect = make_shared<service_provider_process_data_inspection::pd_inspection>(name, "outputs", pdout);

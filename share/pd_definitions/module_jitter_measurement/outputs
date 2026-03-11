@@ -1,0 +1,3 @@
+pds:
+  module_jitter_measurement/outputs:
+    maxever_clamp: { type: double }

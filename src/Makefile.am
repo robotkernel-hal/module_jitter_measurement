@@ -12,7 +12,9 @@ libmodule_jitter_measurement_la_LDFLAGS  = -Wall -release $(PACKAGE_VERSION)
 
 VPATH = $(srcdir):$(top_srcdir)/share
 
-GEN_DEFINITIONS = service_definitions/module_jitter_measurement/reset_max_ever pd_definitions/module_jitter_measurement/inputs
+GEN_DEFINITIONS = service_definitions/module_jitter_measurement/reset_max_ever \
+				  pd_definitions/module_jitter_measurement/inputs \
+				  pd_definitions/module_jitter_measurement/outputs
 
 $(top_builddir)/src/gen_definitions.h: Makefile $(GEN_DEFINITIONS)
 	@echo creating $@

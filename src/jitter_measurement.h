@@ -88,20 +88,8 @@ class jitter_measurement :
 
         double new_maxever_threshold; //!< threshold for trigger on new maxever
 
-        struct jitter_pdin {
-            double maxever;         //! max ever seen jitter
-            double last_max;
-            double last_cycle;
-            uint64_t last_ts;
-            double maxever_time; // unix timestamp of last maxever increment!
-        };
+        pd_inputs::data local_pdin;
 
-        struct jitter_pdin local_pdin;
-
-        struct jitter_pdout {
-            double max_ever_clamp;
-        };
-    
         // named process data
         robotkernel::sp_process_data_t pdin;
         robotkernel::sp_pd_provider_t pdin_provider;
