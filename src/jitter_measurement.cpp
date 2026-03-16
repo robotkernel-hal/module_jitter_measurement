@@ -155,7 +155,7 @@ void jitter_measurement::print() {
             uint64_t act_buf_val = chrono::duration_cast<chrono::nanoseconds>(act_buf[i].time_since_epoch()).count();
             uint64_t log_diff_val = log_diff[i].count();
             snprintf(dump_buf, 512, "%" PRIu64 "\t%" PRIu64 "\n", act_buf_val, log_diff_val);
-            write(dump_fd, dump_buf, strlen(dump_buf));
+            (void)write(dump_fd, dump_buf, strlen(dump_buf));
             fsync(dump_fd);
         }
     }
@@ -316,6 +316,6 @@ void jitter_measurement::set_state_safeop_2_op() {
     robotkernel::add_device(pdout);
     robotkernel::add_device(pdout_inspect);
 
-    trg->aquire();
+    trg->acquire();
 }
 
