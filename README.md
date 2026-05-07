@@ -22,9 +22,19 @@ buffer_size: 1000
 #########################################################
 # Trigger device
 trigger:
+  # Trigger device name, must be registered to robotkernel
+  # before switching to SAFEOP
   dev_name: timer.main.trigger
-  prio: 50
-  affinity: [ 2, 3 ]
+
+  # Optional priority with which we are triggerd
+  #prio: 50
+
+  # Optional cpu affinity on which cpu when run on.
+  #affinity: [ 2, 3 ]
+
+  # Optional trigger mode, direct mode means in callers
+  # thread context, no direct mode uses worker thread.
+  #direct_mode: True
 
 #########################################################
 # logging settings
