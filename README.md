@@ -5,13 +5,32 @@ This modules does jitter measurement on incoming trigger device pulses.
 ```yaml
 - name: jitter_1
   so_file: libmodule_jitter_measurement.so
-  config:
-    buffer_size: 1000
-  trigger:
-  - dev_name: timer.posix_timer.trigger
-    direct_mode: true
+  config: !include jitter.rkc
   power_up: init
-  depends: timer
+  depends: [ timer, ]
+```
+
+```yaml
+# Configuration file for module_jitter_measurement.
+#
+# vim: ft=yaml
+
+#########################################################
+# measurement settings
+buffer_size: 1000
+
+#########################################################
+# Trigger device
+trigger:
+  dev_name: timer.main.trigger
+  prio: 50
+  affinity: [ 2, 3 ]
+
+#########################################################
+# logging settings
+
+# Standard robotkernel module local loglevel.
+#loglevel: verbose
 ```
 
 buffer_size
