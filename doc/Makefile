@@ -17,7 +17,7 @@ help:
 
 install:
 	rm -rf $(GHPAGESDIR)
-	git clone `git config --get remote.origin.url` --branch gh-pages --depth 1 $(GHPAGESDIR)
+	git clone $(shell git config --get remote.origin.url) --branch gh-pages --depth 1 $(GHPAGESDIR)
 	rm -rf $(GHPAGESDIR)/*
 	cp -r build/html/* $(GHPAGESDIR)/
 	git -C $(GHPAGESDIR) config user.name "Robert Burger"
