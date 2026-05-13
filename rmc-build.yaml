@@ -11,5 +11,7 @@ builds:
     test_package: module_test_package
   - context: conan
     build_file: doc/conanfile.py
-    configuration: current_linux
+    configuration: 
+      - imports:
+        - current_linux
 
