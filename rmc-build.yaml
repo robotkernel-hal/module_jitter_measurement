@@ -9,4 +9,7 @@ builds:
     build_file: conanfile.py
     configurations: *build_configs
     test_package: module_test_package
+  - context: conan
+    build_file: doc/conanfile.py
+    configuration: current_linux
 
