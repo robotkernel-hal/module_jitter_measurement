@@ -12,5 +12,5 @@ builds:
   - context: conan
     build_file: doc/conanfile.py
     configuration: 
-    - default
+    - ubuntu2404-x86_64
 
