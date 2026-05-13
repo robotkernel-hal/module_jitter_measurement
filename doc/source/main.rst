@@ -1,5 +1,1 @@
-
-.. toctree::
-   :maxdepth: 3
-
-   introduction
+.. include:: introduction.rst
