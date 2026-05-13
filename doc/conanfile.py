@@ -25,7 +25,7 @@ class MainProject(ConanFile):
     ]
 
 
-    def get_remote_url():
+    def get_remote_url(self):
         parsed = urlparse(self.url)
 
         if parsed.scheme not in ("http", "https"):
