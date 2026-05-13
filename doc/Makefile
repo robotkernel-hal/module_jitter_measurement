@@ -14,6 +14,19 @@ help:
 
 .PHONY: help Makefile
 
+install:
+	rm -rf $(GHPAGESDIR)
+	git clone `git config --get remote.origin.url` --branch gh-pages --depth 1 $(GHPAGESDIR)
+	rm -rf $(GHPAGESDIR)/*
+	cp -r build/html/* $(GHPAGESDIR)/
+	git -C $(GHPAGESDIR) config user.name "Robert Burger"
+	git -C $(GHPAGESDIR) config user.email "robert.burger@dlr.de"
+	git -C $(GHPAGESDIR) add "*"
+	touch $(GHPAGESDIR)/.nojekyll
+	git -C $(GHPAGESDIR) add .nojekyll
+	-git -C $(GHPAGESDIR) commit -m 'Automatic update of GH pages'
+	git -C $(GHPAGESDIR) push
+
 # Catch-all target: route all unknown targets to Sphinx using the new
 # "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
 %: Makefile
