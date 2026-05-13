@@ -2,6 +2,7 @@ from conan import ConanFile
 from conan import tools
 from conan.tools.files import mkdir, chdir, copy
 from conan.tools.gnu import Autotools, AutotoolsToolchain
+from conan.tools.scm import Git
 import os
 
 class MainProject(ConanFile):
@@ -31,8 +32,11 @@ class MainProject(ConanFile):
         autotools.make(target="html")
 
     def package(self):
+        git = Git(self)
+        remoteurl = git.get_remote_url()
+
         autotools = Autotools(self)
-        autotools.install()
+        autotools.install(args=[f'REMOTEURL={remoteurl}'])
 
     def package_info(self):
         self.cpp_info.includedirs = ['include']

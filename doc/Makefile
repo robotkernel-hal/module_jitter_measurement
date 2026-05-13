@@ -8,6 +8,7 @@ SPHINXBUILD   ?= sphinx-build
 SOURCEDIR     = source
 BUILDDIR      = build
 GHPAGESDIR    = gh-pages
+REMOTEURL     ?= $(shell git config --get remote.origin.url)
 
 # Put it first so that "make" without argument is like "make help".
 help:
@@ -17,7 +18,7 @@ help:
 
 install:
 	rm -rf $(GHPAGESDIR)
-	git clone $(shell git config --get remote.origin.url) --branch gh-pages --depth 1 $(GHPAGESDIR)
+	git clone $(REMOTEURL) --branch gh-pages --depth 1 $(GHPAGESDIR)
 	rm -rf $(GHPAGESDIR)/*
 	cp -r build/html/* $(GHPAGESDIR)/
 	git -C $(GHPAGESDIR) config user.name "Robert Burger"
