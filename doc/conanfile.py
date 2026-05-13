@@ -4,6 +4,7 @@ from conan.tools.files import mkdir, chdir, copy
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.scm import Git
 import os
+from urllib.parse import urlparse
 
 class MainProject(ConanFile):
     name = "module_jitter_measurement_doc"
@@ -23,6 +24,18 @@ class MainProject(ConanFile):
         "sphinxcontrib-jquery/[>=4 <5]@pypi/stable",
     ]
 
+
+    def get_remote_url():
+        parsed = urlparse(self.url)
+
+        if parsed.scheme not in ("http", "https"):
+            return url
+
+        host = parsed.hostname
+        path = parsed.path.lstrip("/")
+
+        return f"git@{host}:{path}"
+
     def generate(self):
         tc = AutotoolsToolchain(self)
         tc.generate()
@@ -32,11 +45,8 @@ class MainProject(ConanFile):
         autotools.make(target="html")
 
     def package(self):
-        git = Git(self, folder=self.recipe_folder)
-        remoteurl = git.get_remote_url()
-
         autotools = Autotools(self)
-        autotools.install(args=[f'REMOTEURL={remoteurl}'])
+        autotools.install(args=[f'REMOTEURL={self.get_remote_url()}'])
 
     def package_info(self):
         self.cpp_info.includedirs = ['include']
