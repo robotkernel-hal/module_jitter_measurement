@@ -11,7 +11,7 @@ Welcome to module_jitter_measurement's documentation!
    :caption: Contents:
    :numbered:
 
-    main
+   main
 
 Indices and tables
 ==================
