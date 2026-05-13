@@ -32,7 +32,7 @@ class MainProject(ConanFile):
         autotools.make(target="html")
 
     def package(self):
-        git = Git(self)
+        git = Git(self, folder=self.source_folder)
         remoteurl = git.get_remote_url()
 
         autotools = Autotools(self)
