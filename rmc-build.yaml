@@ -11,6 +11,7 @@ builds:
     test_package: module_test_package
   - context: conan
     build_file: doc/conanfile.py
-    configuration: 
-    - ubuntu2404-x86_64
+    configurations: 
+    - imports:
+      - current_linux
 
