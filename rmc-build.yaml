@@ -12,6 +12,5 @@ builds:
   - context: conan
     build_file: doc/conanfile.py
     configuration: 
-      - imports:
-        - current_linux
+    - default
 
