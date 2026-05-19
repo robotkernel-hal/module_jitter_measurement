@@ -1,4 +1,4 @@
-module-jitter-measurement (6.0.0) unstable; urgency=low
+module-jitter-measurement (6.0.0) stable; urgency=low
 
   * fix: print format issues
 
