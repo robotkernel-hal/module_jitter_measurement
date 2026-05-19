@@ -12,7 +12,7 @@ class TestTestConan(ConanFile):
     generators = "VirtualRunEnv"
 
     def requirements(self):
-        self.requires("module_posix_timer/[~6]@robotkernel/unstable")
+        self.requires("module_posix_timer/[~6]@robotkernel/stable")
         self.requires(self.tested_reference_str)
 
     def test(self):
