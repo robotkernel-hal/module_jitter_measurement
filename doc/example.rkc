@@ -1,0 +1,27 @@
+# Configuration file for module_posix_timer.
+#
+# vim: ft=yaml
+
+#########################################################
+# timer settings
+
+# Defines the tick interval in seconds for the trigger device.
+interval: 0.002
+
+# Sets the operating mode of the module.
+# Values can be "nanosleep" or "timer".
+#mode: nanosleep
+
+# Signal number to be used in "timer"-mode for timer_create.
+#signo: 35
+
+# Setting realtime priorities for the timer thread.
+prio: 60
+affinity: 0x01
+
+#########################################################
+# logging settings
+
+# Standard robotkernel module local loglevel.
+#loglevel: verbose
+

@@ -1,4 +1,17 @@
-context: conan
-configurations:
-- imports:
-  - linux_defaults_build_profile
+_: &build_configs
+  - imports: [linux_defaults]
+
+builds:
+  - context: conan
+    build_file: share/service_definitions/conanfile.py
+    configurations: *build_configs
+  - context: conan
+    build_file: conanfile.py
+    configurations: *build_configs
+    test_package: module_test_package
+  - context: conan
+    build_file: doc/conanfile.py
+    configurations: 
+    - imports:
+      - current_linux
+

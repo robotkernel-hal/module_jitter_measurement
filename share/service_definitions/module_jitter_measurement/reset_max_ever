@@ -1,0 +1,5 @@
+services:
+  module_jitter_measurement/reset_max_ever:
+    response:
+      maxever: { type: double }
+

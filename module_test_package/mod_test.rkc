@@ -1,0 +1,16 @@
+name: test_kernel
+
+modules:
+- name: timer
+  so_file: libmodule_posix_timer.so
+  config: 
+    timers:
+    - { name: main, interval: 0.001, skip_missed: true, mode: nanosleep, prio: 0, affinity: [ 1 ] }
+  power_up: op
+
+- name: jm 
+  so_file: libmodule_jitter_measurement.so
+  config: { trigger: { dev_name: timer.main.trigger }, buffer_size: 1000 }
+  depends: [ timer, ]
+  power_up: op
+
