@@ -167,7 +167,7 @@ void jitter_measurement::print() {
         maxever_time = new_maxever_time;
         auto now = std::chrono::high_resolution_clock::now();
         double seconds_ago = std::chrono::duration<double>(now - maxever_time).count();
-        log(info, "new max ever is %.3fms ago\n", seconds_ago);
+        log(info, "event=jitter new_max_ever_ago=%.3fms\n", seconds_ago);
 
         std::time_t t = std::chrono::high_resolution_clock::to_time_t(maxever_time);
         maxever_time_string = string_printf("%s", strtok(std::ctime(&t), "\n"));
@@ -186,15 +186,15 @@ void jitter_measurement::print() {
         running_maxever_time_string = string_printf("(%s, %.1fs ago)", maxever_time_string.c_str(), seconds_ago);
     }
 
-    log(info, "mean period: %4.0fus, jitter mean:"
-            " %4.0fus, max %4.0fus, max ever %4.0fus %s\n",
-            cycle*1E6, avgjit*1E6, maxjit*1E6, local_pdin.maxever*1E6, running_maxever_time_string.c_str());
+    log(info, "event=jitter period_us=%-4.0f jitter_us="
+            "%-4.0f max_us=%-4.0f max_ever_us=%-4.0f max_ever_ago_s=%-4.0f\n",
+            cycle*1E6, avgjit*1E6, maxjit*1E6, local_pdin.maxever*1E6, seconds_ago);
 }
 
 //! handler function called if thread is running
 void jitter_measurement::run() {
 
-    log(info, "starting jitter thread\n");
+    log(info, "event=jitter_run message=\"starting jitter thread\"\n");
 
     while (running()) {
         std::unique_lock<std::mutex> lock(sync_mtx);
@@ -207,7 +207,7 @@ void jitter_measurement::run() {
         }
     }
 
-    log(info, "stopped jitter thread\n");
+    log(info, "event=jitter_run message=\"stopped jitter thread\"\n");
 }
 
 //! svc_reset_max_ever
